@@ -1,0 +1,55 @@
+[project]
+name = "gaussian-fwi"
+version = "0.2.0"
+description = "Adaptive anisotropic Gaussian velocity fields for waveform inversion"
+readme = "README.md"
+requires-python = ">=3.12"
+authors = [{name = "Gabriel I. Alonso"}]
+keywords = ["full-waveform-inversion", "seismology", "gaussian", "inverse-problems"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Science/Research",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Physics",
+]
+dependencies = ["torch==2.13.0", "deepwave==0.0.27", "numpy==2.5.2", "scipy==1.18.1"]
+
+[project.optional-dependencies]
+plot = ["matplotlib==3.11.1"]
+dev = ["ruff==0.16.6", "setuptools==84.0.0"]
+
+[project.scripts]
+gaussian-fwi = "run:main"
+
+[project.urls]
+Repository = "https://github.com/arthifact/gaussian_fwi"
+Issues = "https://github.com/arthifact/gaussian_fwi/issues"
+
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["dynamic_refinement", "gaussian_fwi", "fwi_core"]
+py-modules = ["run"]
+
+[tool.setuptools.package-data]
+gaussian_fwi = ["py.typed"]
+dynamic_refinement = ["py.typed", "README.md"]
+fwi_core = ["py.typed"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["results", ".venv"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["dynamic_refinement", "gaussian_fwi", "fwi_core"]
+
+[tool.fwi-verification]
+method = "dynamic_refinement"
+blocked-imports = ["scheduled_growth", "fwi_baselines", "fwi_experiments"]

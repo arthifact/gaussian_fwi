@@ -1,0 +1,77 @@
+{
+  "method": "direct",
+  "field": {
+    "bounds": [
+      1500.0,
+      4500.0
+    ],
+    "background": [
+      1500.0,
+      3000.0
+    ],
+    "sampling": {
+      "max_nyquist_response": 0.001
+    },
+    "backend": "sparse_fused"
+  },
+  "regularization": {
+    "tv_weight": 0.0001,
+    "tikhonov_weight": 0.0,
+    "epsilon": 0.1,
+    "velocity_scale": 100.0,
+    "length_scale": 10.0
+  },
+  "preprocessing": {
+    "time_gain_power": 1.5,
+    "trace_balance_cap": 5.0
+  },
+  "inversion": {
+    "cutoffs": [
+      4.0,
+      7.0,
+      12.0,
+      20.0
+    ],
+    "seed_shape": [
+      32,
+      32
+    ],
+    "steps_per_stage": 1000,
+    "validation_interval": 25,
+    "amplitude_lr": 4.0,
+    "geometry_lr": 0.008,
+    "center_lr_ratio": 0.02,
+    "sigma_ratio": 0.65,
+    "raw_bounds_weight": 0.001,
+    "refinement": {
+      "max_gaussians": 8192,
+      "max_edits": 8,
+      "candidate_pool": 32,
+      "minimum_age": 5,
+      "minimum_relative_gain": 0.0001,
+      "gradient_threshold": 0.0,
+      "max_field_change": 25.0,
+      "split_geometry": "moment",
+      "split_fraction": 0.45,
+      "max_backtracks": 3,
+      "clone_radius_factor": 2.0,
+      "insertion_scales": null,
+      "insertion_separation": 0.5,
+      "merge_distance": 0.2,
+      "merge_shape_tolerance": 0.2,
+      "merge_neighbors": 4,
+      "prune_amplitude": 0.5,
+      "minimum_gaussians": 1,
+      "reset_amplitude": null,
+      "stagnation_window": 5,
+      "stagnation_tolerance": 0.001,
+      "insertion_screening": "coverage_aware",
+      "operations": null
+    },
+    "spatial_radius_schedule": null,
+    "sampling_refinement_factors": [
+      2,
+      4
+    ]
+  }
+}

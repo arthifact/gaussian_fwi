@@ -1,0 +1,59 @@
+{
+  "source": "guarded_benchmark_20260906/protocol.json",
+  "config": {
+    "cutoffs": [
+      4.0,
+      7.0,
+      12.0,
+      20.0
+    ],
+    "levels": [
+      [
+        10,
+        10
+      ],
+      null,
+      null,
+      null
+    ],
+    "steps_per_stage": 100,
+    "validation_interval": 10,
+    "amplitude_lr": 4.0,
+    "geometry_lr": 0.008,
+    "center_lr_ratio": 0.02,
+    "sigma_ratio": 0.65,
+    "raw_bounds_weight": 0.001,
+    "adaptation": null,
+    "density_control": null,
+    "refinement": {
+      "max_gaussians": 100000,
+      "max_edits": 8,
+      "candidate_pool": 32,
+      "minimum_age": 5,
+      "minimum_relative_gain": 0.0001,
+      "gradient_threshold": 0.0,
+      "max_field_change": 25.0,
+      "split_geometry": "moment",
+      "split_fraction": 0.45,
+      "max_backtracks": 3,
+      "clone_radius_factor": 2.0,
+      "insertion_scales": null,
+      "insertion_separation": 0.5,
+      "merge_distance": 0.2,
+      "merge_shape_tolerance": 0.2,
+      "merge_neighbors": 4,
+      "prune_amplitude": 0.5,
+      "minimum_gaussians": 1,
+      "reset_amplitude": null,
+      "stagnation_window": 5,
+      "stagnation_tolerance": 0.001,
+      "comparison_steps": 0,
+      "acceptance_rtol": 1e-06,
+      "acceptance_atol": 1e-12,
+      "minimum_shot_support": 0.0,
+      "directional_splits": false,
+      "relocation": false,
+      "relocation_candidates": 2
+    }
+  }
+}

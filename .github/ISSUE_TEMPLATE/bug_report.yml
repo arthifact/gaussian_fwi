@@ -1,0 +1,24 @@
+name: Bug report
+description: Report an implementation, numerical or packaging problem.
+body:
+  - type: textarea
+    id: behavior
+    attributes:
+      label: Expected and observed behavior
+      description: Describe the input and what went wrong.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Include a small generated input and the exact command when possible.
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Include the commit, Python/dependency versions, device and output of tools/check_environment.py.
+    validations:
+      required: true
