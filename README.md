@@ -62,8 +62,10 @@ window; see the [controlled extension procedure](docs/BASELINE_PROTOCOL.md).
 Each run records configuration, source/data identities, loss history, density
 edits, actual forward/adjoint calls, selected field and completed-stage
 checkpoints. A fresh propagation verifies the reloaded field and predictions.
-Output directories must be new. Results, datasets and old experiments are
-excluded from the repository.
+Output directories must be new. Results, generated observations and old
+experiments are excluded from the repository. Five preserved 70 × 70
+[development models](models/README.md) are included with their original
+provenance manifest; they are resampled and velocity-normalized inputs.
 
 ## Verify
 
@@ -71,7 +73,7 @@ excluded from the repository.
 
 This checks repository structure and links, lints source, runs independent
 numerical/integration tests, builds a clean wheel and repeats the tests outside
-the checkout. It requires no geological datasets or historical outputs.
+the checkout. The numerical tests require no external geological datasets or historical outputs.
 [Verification details](tests/README.md) explain what each group establishes.
 
 ## Repository
@@ -81,6 +83,7 @@ the checkout. It requires no geological datasets or historical outputs.
 | gaussian_fwi/ | Field, decoder, one inversion engine and one density controller |
 | gaussian_fwi/core/ | Internal acoustic, measurement, geometry and I/O support |
 | configs/baseline.json | The single production profile |
+| models/ | Five preserved development arrays, provenance and loading notes |
 | docs/ | Algorithm, mathematical properties, API and evaluation protocol |
 | tests/ | Independent numerical and integration checks |
 | tools/ | Environment and release verification |

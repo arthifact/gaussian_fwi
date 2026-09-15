@@ -122,6 +122,7 @@ def verify(output: Path, reference: Path | None = None) -> dict:
         ROOT / "requirements.txt",
         ROOT / "requirements-dev.txt",
         *sorted((ROOT / "configs").glob("*.json")),
+        *sorted((ROOT / "models").glob("*")),
         ROOT / "run.py",
         Path(__file__),
         ROOT / "tools/validate.py",

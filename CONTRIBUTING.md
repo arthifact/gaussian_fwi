@@ -31,8 +31,10 @@ Short numerical fixtures do not replace substantial research fits.
 ## Repository scope
 
 Commit source, small independent test fixtures, configurations and documentation.
-Keep generated results, datasets, environments, credentials and private research
-notes out of the repository. Document data access and identities in the
+Keep generated results, additional datasets, environments, credentials and
+private research notes out of the repository. The five preserved development
+arrays and their manifest in models/ are explicitly tracked; preserve their
+identities and document their prepared-data limitations. Document data access and identities in the
 appropriate external campaign record.
 
 Follow the [baseline protocol](docs/BASELINE_PROTOCOL.md) for scientific budgets

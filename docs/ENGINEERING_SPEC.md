@@ -65,3 +65,27 @@ must pass those gates before long runs. See [GPU_CAMPAIGN.md](GPU_CAMPAIGN.md).
 The [research protocol](BASELINE_PROTOCOL.md) allocates substantial optimization
 budgets and independent evaluation. No convergence, SOTA, Nature-readiness or
 large-scale 3D claim follows from the release tests or a small synthetic fit.
+
+
+## Preserved development models — September 15, 2026
+
+The owner requested including the five existing models. This bounded data-only
+publication copies the prepared arrays and their provenance manifest unchanged
+into models/. They are a documented exception to the previous dataset exclusion.
+The 70x70 float32 arrays were linearly resampled and independently min-max mapped
+to 1500–4500 m/s. They are development inputs, not native-resolution or unseen
+benchmarks. Grid spacing must be declared by the data-generation experiment.
+
+Compatibility: numerical source, algorithm settings and observation-only input
+schemas remain unchanged. Models are checkout resources; they are not installed
+wheel data. Git ignores other model/data outputs and marks NumPy arrays binary.
+The repository gate loads without pickle and checks SHA-256, shape, dtype,
+finiteness and velocity ranges against the preserved manifest. Release evidence
+records all model identities. Acceptance also compares original/copy/remote
+bytes and runs the normal source/wheel gate in a fresh directory.
+
+Local acceptance passed for all five model identities and metadata, exact
+original/copy equality, narrow Git inclusion and binary clean-filter behavior.
+The source and isolated-wheel suites each passed 61 tests. The normal release
+command was run with --output results/validation/publish_models_20260915.
+No inversion numerical source or baseline configuration was modified.

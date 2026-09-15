@@ -5,3 +5,4 @@
 *.yml text eol=lf
 *.toml text eol=lf
 *.cff text eol=lf
+*.npy binary
