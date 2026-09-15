@@ -9,8 +9,8 @@ import torch
 from torch import Tensor, nn
 from torch.nn import functional as F
 
-from fwi_core.checkpoint import save_torch
-from fwi_core.geometry import GridSpec
+from gaussian_fwi.core.checkpoint import save_torch
+from gaussian_fwi.core.geometry import GridSpec
 
 from .decoder import decode
 from .raster import dense_sum, sparse_sum

@@ -3,11 +3,11 @@
 import unittest
 
 import torch
-from test_dynamic import problem
+from _problems import problem
 
-from dynamic_refinement import GaussianField
-from fwi_core import GridSpec, Preprocessing, Regularization
-from fwi_core.physics import WaveformObjective
+from gaussian_fwi import GaussianField
+from gaussian_fwi.core import GridSpec, Preprocessing, Regularization
+from gaussian_fwi.core.physics import WaveformObjective
 from gaussian_fwi.raster import dense_sum, kernel, pair_chunks, sparse_sum
 
 

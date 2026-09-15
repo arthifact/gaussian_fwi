@@ -4,10 +4,10 @@ from dataclasses import asdict
 
 import torch
 
-from fwi_core import Acquisition, GridSpec
-from fwi_core.checkpoint import prepare_output, save_torch
-from fwi_core.footprints import FootprintAcquisition
 from gaussian_fwi import GaussianField, sample_on_grid
+from gaussian_fwi.core import Acquisition, GridSpec
+from gaussian_fwi.core.checkpoint import prepare_output, save_torch
+from gaussian_fwi.core.footprints import FootprintAcquisition
 
 
 def refined_acquisition(acquisition: Acquisition, factor: int) -> Acquisition:

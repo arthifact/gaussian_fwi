@@ -1,75 +1,67 @@
-# Engineering specification
+# Engineering specification: one Gaussian FWI method
 
-## Current baseline
+## Bounded stage and compatibility
 
-The shareable baseline contains adaptive Gaussian inversion, the scheduled
-control, acoustic/footprint operators, portable observation I/O and independent
-numerical checks. Generated outputs, native datasets, previous campaigns and
-learned-initializer experiments are excluded from source control and packaging.
+Version 0.3 consolidates the previously separate direct/scheduled interfaces into
+one `gaussian_fwi` package, one inversion engine, one density controller and one
+`configs/baseline.json`. Acoustic support is internal to `gaussian_fwi.core`.
+Removed controllers, wrapper packages, profiles and historical experiment
+outputs are absent from this source tree. Their old commits and external
+research archive preserve provenance.
 
-Core field, decoder, propagation, optimization and topology arithmetic are
-preserved. Checkpoint format identifiers and their compatibility branches retain
-their meanings. Experimental initializer APIs are outside this package.
-The observation-only CLI replaces the former dataset-specific launcher; it
-accepts arbitrary valid acquisition grids and has no reference-velocity input.
+This is a declared numerical-policy and API change. The new training format is
+`gaussian-fwi-adc-training-v1`. Reject older training formats before writing or
+propagating. Historical saved fields remain readable; exact field/waveform
+replay is distinct from reproducing an old optimization trajectory. The field,
+decoder and acoustic arithmetic are retained, with namespace imports adjusted.
 
-The direct and scheduled profiles explicitly allocate 1,000 updates per band
-and validation every 25 updates. This is a prospective development allowance,
-not evidence of convergence. GPU shot accumulation and completed-update restart
-are separate planned work in [GPU_CAMPAIGN.md](GPU_CAMPAIGN.md).
+The [algorithm specification](ALGORITHM.md) defines the literature mapping,
+full-training physical gradient statistic, clone/split/prune operations, sampled
+field guard, per-band refinement window and settling-only validation selection.
+No alternative controller or silent policy switch is permitted.
 
-## Change acceptance
+## Independent acceptance
 
-Before implementation, state the bounded change, compatibility and independent
-check. Reproduce a numerical defect or check an independent invariant. Preserve
-survivor/newborn optimizer semantics, zero-amplitude insertion, sampled cumulative
-field-change limits, atomic rollback and actual solve counts.
+- Analytical kernel, dense/sparse/fused gradients, physical finite differences
+  and acoustic directional derivatives for every parameter family.
+- Mean-of-norms selection, deterministic tie order, clone/split/prune decisions,
+  independent child-distribution checks and caller RNG isolation.
+- Full-SPD constraints, physical sampling floors, cumulative event bounds,
+  survivor Adam state, fresh child state and atomic rollback after failure.
+- 2D/3D completion, float32/float64 consistency, zero-gradient behavior,
+  training/validation/test separation and fixed-population settling.
+- Exact completed-stage CPU restart, observation-content identity, obsolete
+  checkpoint rejection, saved-field reload and fresh waveform replay.
+- Actual forward/adjoint counters, clean isolated-wheel tests, blocked obsolete
+  imports, single-profile structure, documentation links and Linux CI.
 
-The clean-repository acceptance requires:
+Run focused tests while developing and the complete gate before release:
 
-- Core source identity reconciliation and unchanged mathematical behavior.
-- Independent field/gradient, physical sampling, optimizer/topology and
-  data-isolation checks.
-- Completing observation-only fits without native data, exact saved CPU
-  propagation, rejected target-bearing bundles and no output overwrite.
-- Source tests and isolated-wheel tests with no external project imports.
-- Package allowlist, local documentation links and clean source publication.
-- Optional external historical replay when reference checkpoints are supplied.
-
-## Commands
-
-    python tools/check_environment.py
-    python tools/check_repository.py
-    python -m unittest discover -s tests/unit -v
     python tools/validate.py --release
 
-The release tool creates a fresh directory under results/validation/. To use a
-particular fresh destination:
+Each release writes a fresh ignored directory containing logs, exact source and
+verification-input hashes, environment, wheel identity and discovered test IDs.
+The installed suite must have no failures, skips or expected failures.
+Historical field references are optional and kept outside the source repository.
 
-    python tools/validate.py --release --output results/validation/my_release
+## Current acceptance and limitations
 
-Historical checks are optional and use a separately retained reference with
-2/ and 3/ subdirectories:
+Local release acceptance passed 61 source tests and the identical 61 tests from
+a clean isolated wheel, with no skips. Historical 2D/3D field and waveform replay
+was exact. An independent AST audit preserved the arithmetic in 14 field/core
+files, excluding namespace imports. A separate 4,000-update CPU diagnostic
+completed and passed saved-field, work-count, population and NumPy field-oracle
+checks. It does not establish convergence. Generated logs, numerical results and
+figures stay outside version control. GitHub Actions runs the same source/wheel
+gate on Linux for every main-branch update.
+Evidence establishes the tested software properties, not a universal optimum
+for the heuristic density settings or a scientific performance result.
 
-    python tools/validate.py --release \
-      --output results/validation/my_replay \
-      --reference /path/to/reference
+The observation-only runner executes CPU fits and supports completed-stage
+restart. CUDA shot accumulation, GPU gradient/state checks and mid-stage restart
+remain the next bounded engineering stage. The Windows 11 / RTX 4060 campaign
+must pass those gates before long runs. See [GPU_CAMPAIGN.md](GPU_CAMPAIGN.md).
 
-Do not commit generated verification directories. Preserve full reports and
-source/input identities in an external evidence archive or CI artifacts.
-These checks establish software properties; substantial research fits follow
-[BASELINE_PROTOCOL.md](BASELINE_PROTOCOL.md).
-
-## Next bounded work
-
-Initial clean-export acceptance completed on Python 3.12.13 / macOS arm64:
-72 source tests, 72 isolated-wheel tests and exact external historical 2D/3D
-replays passed. The core numerical implementation comprises 26 unchanged source
-files. The cleaned suite omits tests for excluded experimental modules and adds
-portable bundle/CLI acceptance; no retained numerical tolerance was relaxed.
-Verification outputs remain outside the published source tree.
-
-Implement an explicit CUDA campaign path with correctly normalized shot
-accumulation and completed-update restart. Predeclare numerical tolerances,
-test independent gradients and state invariants, then profile on the actual
-RTX 4060. CPU release success does not certify GPU performance or accuracy.
+The [research protocol](BASELINE_PROTOCOL.md) allocates substantial optimization
+budgets and independent evaluation. No convergence, SOTA, Nature-readiness or
+large-scale 3D claim follows from the release tests or a small synthetic fit.

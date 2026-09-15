@@ -2,8 +2,8 @@ import unittest
 
 import torch
 
-from fwi_core import Acquisition, GridSpec, Observations
-from fwi_core.footprints import FootprintAcquisition, GaussianFootprint
+from gaussian_fwi.core import Acquisition, GridSpec, Observations
+from gaussian_fwi.core.footprints import FootprintAcquisition, GaussianFootprint
 
 
 class ObservationIdentityTests(unittest.TestCase):

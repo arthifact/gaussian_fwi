@@ -5,7 +5,7 @@ title: "Gaussian FWI: Adaptive Gaussian Velocity Fields"
 authors:
   - family-names: Alonso
     given-names: Gabriel I.
-version: 0.2.0
+version: 0.3.0
 repository-code: "https://github.com/arthifact/gaussian_fwi"
 keywords:
   - full waveform inversion

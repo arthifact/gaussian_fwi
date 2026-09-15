@@ -54,53 +54,35 @@ assert test_ids and len(test_ids) == len(set(test_ids)), 'Empty or duplicate tes
 result = unittest.TextTestRunner(verbosity=2).run(suite)
 assert (result.wasSuccessful() and not result.skipped and not result.expectedFailures
         and result.testsRun == len(test_ids)), 'Installed tests failed, skipped, or incomplete'
-regressions = []
+replays = []
 if reference is not None:
     import torch
-    method = importlib.import_module(settings['method'])
-    test_name = 'test_dynamic' if settings['method'] == 'dynamic_refinement' else 'test_scheduled'
-    checks = sys.modules[test_name]
+    from gaussian_fwi import GaussianField
+    from _problems import problem
     torch.set_num_threads(2)
     for dimension in (2, 3):
-        field, data, partitions = checks.problem(dimension)
-        destination = output / 'regression' / str(dimension)
-        report = method.invert(
-            field, data, checks.configuration(dimension), destination,
-            partitions=partitions,
-            regularization=checks.Regularization(tv_weight=1e-4),
-            preprocessing=checks.Preprocessing(time_gain_power=1.5, trace_balance_cap=5),
-        )
         before = reference / str(dimension)
-        for filename in ('field.pt', 'predictions.pt'):
-            checks.assert_exact(
-                torch.load(before / filename, weights_only=True),
-                torch.load(destination / filename, weights_only=True),
-            )
-        for stage in (0, 1):
-            a = torch.load(before / f'stage_{stage:02d}.pt', weights_only=True)
-            b = torch.load(destination / f'stage_{stage:02d}.pt', weights_only=True)
-            # A missing optional selector means the historical algorithm. Only
-            # normalize that declared default; retain exact numerical checks.
-            for payload in (a, b):
-                refinement = payload['specification']['config'].get('refinement')
-                if refinement is not None:
-                    refinement.setdefault('insertion_screening', 'legacy')
-                    refinement.setdefault('operations', None)
-            for key in ('specification', 'field', 'optimizer', 'stages', 'solver_calls',
-                        'topology_state', 'topology_history', 'initial_velocity', 'initial_prediction'):
-                checks.assert_exact(a.get(key), b.get(key))
-        regressions.append({
-            'dimension': dimension, 'exact_match': True,
-            'configuration_defaults_normalized': [
-                'refinement.insertion_screening=legacy', 'refinement.operations=null',
-            ],
-            'solver_calls': report['solver_calls'],
-        })
+        field = GaussianField.load(before / 'field.pt')
+        saved = torch.load(before / 'predictions.pt', weights_only=True)
+        _, data, _ = problem(dimension)
+        counts = dict(data.acquisition.counts)
+        with torch.no_grad():
+            velocity = field()
+            torch.testing.assert_close(velocity, saved['final_velocity'], rtol=0, atol=0)
+            prediction = data.acquisition.simulate(velocity)
+            torch.testing.assert_close(prediction, saved['final_prediction'], rtol=0, atol=0)
+            for block in field.blocks:
+                torch.linalg.cholesky(block.covariance())
+        work = {name: data.acquisition.counts[name] - counts[name] for name in counts}
+        assert work == {'forward': 1, 'adjoint': 0}
+        replays.append({'dimension': dimension, 'field_and_waveform_exact': True,
+                        'additional_solver_calls': work,
+                        'scope': 'Saved field compatibility; no old training trajectory replay'})
 record = {
     'passed': True, 'tests': result.testsRun, 'isolated_python': True,
     'test_ids': test_ids,
     'all_packages_from_wheel': True, 'blocked_imports': list(blocked),
-    'pre_move_regressions': regressions,
+    'historical_field_replays': replays,
     'environment': {
         'python': platform.python_version(), 'implementation': platform.python_implementation(),
         'platform': platform.platform(), 'machine': platform.machine(),
@@ -147,7 +129,6 @@ def verify(output: Path, reference: Path | None = None) -> dict:
         *sorted((ROOT / "examples").glob("*.py")),
         *sorted((ROOT / ".github/workflows").glob("*.yml")),
         *sorted((TESTS / "unit").glob("*.py")),
-        *sorted((TESTS / "fixtures").glob("*")),
     ]
     verification_hashes = {
         str(path.relative_to(ROOT)): digest(path) for path in evidence_inputs if path.is_file()
@@ -175,7 +156,7 @@ def verify(output: Path, reference: Path | None = None) -> dict:
                 source / directory,
                 ignore=shutil.ignore_patterns("__pycache__", "*.pyc"),
             )
-        for name in ("unit", "fixtures"):
+        for name in ("unit",):
             shutil.copytree(
                 TESTS / name,
                 tests / name,
@@ -241,7 +222,7 @@ def verify(output: Path, reference: Path | None = None) -> dict:
     (output / "verification.json").write_text(json.dumps(result, indent=2) + "\n")
     print(
         json.dumps(
-            {key: result[key] for key in ("passed", "method", "tests", "pre_move_regressions")}
+            {key: result[key] for key in ("passed", "method", "tests", "historical_field_replays")}
         ),
         flush=True,
     )
@@ -253,7 +234,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--output", type=Path, required=True, help="New directory under results/validation"
     )
-    parser.add_argument("--reference", type=Path, help="Optional external historical 2D/3D reference fits")
+    parser.add_argument("--reference", type=Path, help="Optional external 2D/3D saved-field references (not training restart)")
     args = parser.parse_args()
     output = args.output.resolve()
     results = ROOT / "results/validation"
@@ -261,5 +242,5 @@ if __name__ == "__main__":
         parser.error("Choose a new directory under results/validation")
     reference = args.reference.resolve() if args.reference is not None else None
     if reference is not None and not all((reference / str(d)).is_dir() for d in (2, 3)):
-        parser.error("Reference must contain both the 2 and 3 dimensional pre-move fits")
+        parser.error("Reference must contain both the 2 and 3 dimensional saved-field fixtures")
     verify(output, reference)

@@ -6,11 +6,11 @@ from dataclasses import replace
 from pathlib import Path
 
 import torch
-from test_dynamic import assert_exact, configuration, problem
+from _problems import assert_exact, configuration, problem
 
-import dynamic_refinement as fwi
-from fwi_core import Observations, Preprocessing
-from fwi_core.physics import WaveformObjective
+import gaussian_fwi as fwi
+from gaussian_fwi.core import Observations, Preprocessing
+from gaussian_fwi.core.physics import WaveformObjective
 
 
 class IsolationTests(unittest.TestCase):

@@ -1,5 +1,4 @@
 {
-  "method": "scheduled",
   "field": {
     "bounds": [
       1500.0,
@@ -32,23 +31,9 @@
       12.0,
       20.0
     ],
-    "levels": [
-      [
-        32,
-        32
-      ],
-      [
-        40,
-        40
-      ],
-      [
-        48,
-        48
-      ],
-      [
-        56,
-        56
-      ]
+    "seed_shape": [
+      32,
+      32
     ],
     "steps_per_stage": 1000,
     "validation_interval": 25,
@@ -57,10 +42,21 @@
     "center_lr_ratio": 0.02,
     "sigma_ratio": 0.65,
     "raw_bounds_weight": 0.001,
-    "adaptation": null,
-    "density_control": null,
-    "refinement": null,
-    "spatial_radius_schedule": null,
+    "refinement": {
+      "warmup_steps": 50,
+      "interval": 50,
+      "stop_fraction": 0.5,
+      "gradient_threshold": 0.0,
+      "split_extent_fraction": 0.01,
+      "max_gaussians": 8192,
+      "max_growth": 128,
+      "max_prunes": 128,
+      "minimum_gaussians": 1,
+      "minimum_age": 50,
+      "prune_amplitude": 0.5,
+      "max_field_change": 25.0,
+      "seed": 0
+    },
     "sampling_refinement_factors": [
       2,
       4

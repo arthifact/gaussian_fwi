@@ -7,13 +7,12 @@ from dataclasses import replace
 from pathlib import Path
 
 import torch
-from test_dynamic import assert_exact, problem
+from _problems import assert_exact, configuration, problem
 
-import dynamic_refinement
 import gaussian_fwi
-from fwi_core import GridSpec, Observations
-from fwi_core.footprints import FootprintAcquisition, GaussianFootprint
-from fwi_core.identity import observation_sha256
+from gaussian_fwi.core import GridSpec, Observations
+from gaussian_fwi.core.footprints import FootprintAcquisition, GaussianFootprint
+from gaussian_fwi.core.identity import observation_sha256
 
 
 class RestartIdentityTests(unittest.TestCase):
@@ -29,10 +28,10 @@ class RestartIdentityTests(unittest.TestCase):
             with torch.no_grad():
                 data = Observations(acquisition, acquisition.simulate(field()+45))
         data.sha256 = label
-        config = module.InversionConfig((10., 20.), steps_per_stage=2, validation_interval=1)
+        config = replace(configuration(), seed_shape=None, steps_per_stage=2, validation_interval=1)
         return field, data, partitions, config
 
-    def reject(self, module, checkpoint, data, destination, message="observations.*do not match"):
+    def reject(self, module, checkpoint, data, destination, message="observation.*not match"):
         before = data.acquisition.counts
         with self.assertRaisesRegex(ValueError, message):
             module.resume(checkpoint, data, destination)
@@ -40,7 +39,7 @@ class RestartIdentityTests(unittest.TestCase):
         self.assertFalse(destination.exists())
 
     def test_changed_content_is_rejected_with_empty_and_stale_nonempty_labels(self):
-        for module in (gaussian_fwi, dynamic_refinement):
+        for module in (gaussian_fwi,):
             for label in ("", "stale-caller-label"):
                 with self.subTest(api=module.__name__, label=label), tempfile.TemporaryDirectory() as tmp:
                     field, data, split, config = self.fixture(module, label=label)
@@ -67,7 +66,7 @@ class RestartIdentityTests(unittest.TestCase):
                             self.reject(module, root / "fit/stage_00.pt", changed, root / name)
 
     def test_matching_clones_resume_exactly_for_point_and_finite_measurements(self):
-        for module in (gaussian_fwi, dynamic_refinement):
+        for module in (gaussian_fwi,):
             for finite in (False, True):
                 with self.subTest(api=module.__name__, finite=finite), tempfile.TemporaryDirectory() as tmp:
                     field, data, split, config = self.fixture(module, footprint=finite)
@@ -98,7 +97,7 @@ class RestartIdentityTests(unittest.TestCase):
                         self.reject(module, root / "fit/stage_00.pt", changed, root / "changed_footprint")
 
     def test_legacy_and_unknown_identities_are_rejected_even_with_matching_labels(self):
-        for module in (gaussian_fwi, dynamic_refinement):
+        for module in (gaussian_fwi,):
             with self.subTest(api=module.__name__), tempfile.TemporaryDirectory() as tmp:
                 field, data, split, config = self.fixture(module)
                 data.sha256 = observation_sha256(data.acquisition, data.traces)
@@ -109,11 +108,11 @@ class RestartIdentityTests(unittest.TestCase):
                     payload = deepcopy(original)
                     if name == "missing":
                         payload.pop("observation_identity", None)
-                        message = "Legacy.*content identity"
+                        message = "observation.*not match"
                     else:
                         payload["observation_identity"] = {"format": "unknown" if name == "unknown" else "gaussian-fwi-observation-content-v1",
                                                            "sha256": "0"*64}
-                        message = "observations.*do not match"
+                        message = "observation.*not match"
                     checkpoint = root / f"{name}.pt"
                     torch.save(payload, checkpoint)
                     self.reject(module, checkpoint, data, root / name, message)

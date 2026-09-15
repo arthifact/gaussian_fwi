@@ -13,7 +13,7 @@ check, commands, evidence and limitations.
 
 Run the relevant focused checks while developing. The final source/wheel gate
 must pass in a fresh output directory. Use independent formulas, finite
-differences, conservation/state invariants and completing integration checks.
+differences, independent sampling/state invariants and completing integration checks.
 Short numerical fixtures do not replace substantial research fits.
 
 ## Numerical contract
@@ -23,9 +23,9 @@ Short numerical fixtures do not replace substantial research fits.
 - Field and propagation grid shape/spacing must agree.
 - Training waveforms drive optimization and topology; validation selects.
   Keep test waveforms and target velocities out of FWI tuning and ranking.
-- Preserve surviving Adam state, initialize newborn state, insert at zero
+- Preserve surviving Adam state, initialize newborn state, seed at zero
   amplitude and roll back rejected topology edits atomically.
-- Count actual forward/adjoint solves, including trials and independent checks.
+- Count actual forward/adjoint solves, including recomputation and independent checks.
 - Never overwrite an existing fit. Retain unsuccessful and negative outcomes.
 
 ## Repository scope
@@ -37,3 +37,7 @@ appropriate external campaign record.
 
 Follow the [baseline protocol](docs/BASELINE_PROTOCOL.md) for scientific budgets
 and [engineering specification](docs/ENGINEERING_SPEC.md) for release acceptance.
+
+Maintain one public inversion method. Specify mechanism ablations in the external
+research record rather than adding competing production controllers. Sampled
+splits and clones can change the field; do not assert moment conservation.

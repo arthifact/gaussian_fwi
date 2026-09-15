@@ -10,11 +10,11 @@ from dataclasses import asdict, replace
 from pathlib import Path
 
 import torch
-from test_dynamic import configuration, problem
+from _problems import configuration, problem
 
 import run
-from fwi_core import Preprocessing, Regularization
-from fwi_core.io import load_observations, save_observations
+from gaussian_fwi.core import Preprocessing, Regularization
+from gaussian_fwi.core.io import load_observations, save_observations
 
 
 class RunnerTests(unittest.TestCase):
@@ -22,12 +22,10 @@ class RunnerTests(unittest.TestCase):
     def setUpClass(cls):
         torch.set_num_threads(2)
 
-    def test_direct_runner_exposes_sampling_recovery_and_saved_field_diagnostics(self):
+    def test_runner_exposes_refinement_and_saved_field_diagnostics(self):
         field, data, partitions = problem()
         cfg = configuration()
-        cfg = replace(cfg, refinement=replace(cfg.refinement, comparison_steps=2,
-                                              insertion_screening="coverage_aware"))
-        profile = {"method": "direct", "field": {"background": [2100, 2600], "bounds": [1500, 4500],
+        profile = {"field": {"background": [2100, 2600], "bounds": [1500, 4500],
                                                    "backend": "sparse_fused",
                                                    "sampling": {"max_nyquist_response": .001}},
                    "inversion": asdict(cfg), "regularization": asdict(Regularization()),
@@ -42,7 +40,7 @@ class RunnerTests(unittest.TestCase):
             self.assertEqual(data.acquisition.counts, before)
             fitted, report = run.fit_observations(data, partitions, profile, path)
             self.assertEqual(fitted.backend, "sparse_fused")
-            self.assertTrue(any("trial" in e for e in report["topology_history"]))
+            self.assertTrue(bool(report["topology_history"]))
             self.assertTrue((path / "sampling.json").is_file())
             before = data.acquisition.counts
             run.verify_fit(fitted, data, report, path)
@@ -79,7 +77,6 @@ class RunnerTests(unittest.TestCase):
         _, data, partitions = problem()
         cfg = replace(configuration(), steps_per_stage=2, validation_interval=1)
         profile = {
-            "method": "direct",
             "field": {"background": [2100, 2600], "bounds": [1500, 4500],
                       "backend": "sparse_fused"},
             "inversion": asdict(cfg),

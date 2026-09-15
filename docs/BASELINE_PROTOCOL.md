@@ -1,109 +1,103 @@
-# Baseline research protocol
+# Research evaluation protocol
 
-## Primary question
+## Question and scope
 
-Does adapting Gaussian geometry and population improve the accuracy-storage
-tradeoff of multiscale velocity fields, and does that benefit survive optimization
-from seismic waveforms at a disclosed computational cost?
+Evaluate one method: waveform inversion using the continuous Gaussian field and
+[adaptive density-control algorithm](ALGORITHM.md). Test whether it offers a
+useful accuracy/storage/work tradeoff under a fixed acoustic measurement model.
+Do not assume that dynamic refinement is universally better, or that a Gaussian
+representation by itself is novel. Literature motivates the mechanism; its FWI
+benefit remains an empirical question.
 
-The contribution under evaluation is an explicit representation with movable
-centers, full SPD covariance, signed amplitudes and controlled physical scales.
-Compactness, reconstruction quality and speed are separate empirical outcomes.
-The [method derivation](METHODS.md) supplies the implemented equations and
-bounded mathematical properties.
+There is one shipped optimizer and one baseline profile. A scientific comparison
+can still use an external, independently maintained grid-FWI reference and
+controlled mechanism ablations. Such controls are experiment definitions, not
+additional public inversion engines in this repository. Record each external
+implementation, version and numerical acceptance before using it.
 
-## Development before evaluation
+## Freeze the experiment before final evaluation
 
-Use meaningful physical domains, initially planning for a 256x512 grid. Obtain
-original geological references or use declared analytic continuous structures.
-Upsampling small images does not supply geological detail.
+Record physical units and domain, data provenance, wavelet, acquisition,
+propagation/PML settings, initial background, noise model, partitions, loss
+normalization, regularization, Gaussian seed, density settings, budget and
+selection rules. Use development cases to select these settings; reserve final
+cases and test receivers for evaluation. Preserve failures and every attempted
+configuration in an external immutable campaign record.
 
-| Work | Initial allowance | Development extensions |
-|---|---|---|
-| Direct supervised representation | 5,000 full-data updates | 10,000, then 20,000 |
-| Waveform inversion | 1,000 updates per band; four bands = 4,000 | 8,000, then 16,000 total |
+Train with training waveforms. Select within each stage's fixed-population
+settling window using validation waveforms. Test data and reference velocity
+must not affect fitting, density decisions, tuning or checkpoint selection.
+Generate independent evaluation data on a justified finer discretization or
+independent solver, with consistent physical source/receiver footprints. A
+same-grid noiseless reconstruction is an engineering diagnostic, not adequate
+independent seismic evidence.
 
-Tune suitable optimizer schedules on development data with disclosed effort.
-Inspect training and validation trajectories, scaled gradients/updates,
-oscillation, active width/velocity bounds and topology events. Diagnose thin-bed
-errors by separating sampling, width constraints, optimizer stagnation and
-capacity. More updates are warranted while useful improvement continues.
+## Substantial convergence allowances
 
-For descriptive plateau assessment, inspect three consecutive windows of best
-training loss: 500 updates per window for representation; 200 within a fixed
-FWI frequency objective. A candidate plateau requires less than 0.5% relative
-improvement in each window after the initial allowance. Handle zero loss
-explicitly and inspect typical losses so minima do not hide instability.
-FWI validation must also be stable. A plateau is not a global-optimum guarantee.
+| Development tier | Updates per frequency stage | Four-stage total |
+|---|---:|---:|
+| Initial | 1,000 | 4,000 |
+| Extension | 2,000 | 8,000 |
+| Further extension | 4,000 | 16,000 |
 
-A fit still improving at its budget remains budget-limited. Freeze the evaluation
-allowance and selection rules after development; never extend only a favorable
-evaluation case. Different multistage horizons can change earlier validation
-selection and refinement, so preserve separate runs and count repeated work.
+One update includes all training shots, irrespective of microbatch size. Short
+unit fixtures and throughput probes are not fits. Extend development runs when
+late training/validation trends, selected-step locations or budget extensions
+show meaningful unfinished optimization. Preserve each run; do not overwrite it.
+An exhausted budget is not proof of convergence. Report late-window loss
+changes and parameter/field changes alongside complete curves.
 
-## Representation and mechanism
+Changing `steps_per_stage` with an unchanged `stop_fraction` also changes the
+number of density opportunities. For a controlled study of longer settling,
+keep the absolute refinement stop at update 500: use stop fractions 0.5, 0.25
+and 0.125 for the three tiers above, keeping warm-up, interval and all other
+settings fixed. Store each complete profile in the campaign record. Comparisons
+that instead scale the refinement window evaluate a different resource
+allocation and must say so. Current stage restart does not extend an already
+completed stage; run each declared budget from the same initialization until a
+separately accepted continuation facility exists.
 
-Use inclined thin layers, a faulted contact and a curved boundary. Compare
-Gaussians, a competitive classical compact basis and a scalar continuous neural
-representation at capacities matched by total degrees of freedom or stored bytes.
-Gaussian capacities are initially 1,024 / 4,096 / 8,192.
+An optional supervised representation diagnostic has a separate question:
+accuracy of fitting a known field. Budget 5,000 updates, then 10,000 or 20,000
+when needed. Label truth supervision explicitly and never present these fits
+as FWI results. No supervised study engine is bundled here.
 
-Three structures x three capacities x three methods gives 27 primary direct
-fits. Predeclare two additional starts at the middle capacity per case/method:
-18 additional fits. Use independent denser/interstitial evaluation queries.
-Report physical-unit RMSE, relative error, interface/thickness errors where
-defined, complete model bytes and time to a declared quality.
+## Evaluation matrix
 
-Compare fixed/adaptive populations and targeted anisotropy/moving-center
-controls. A common ceiling does not guarantee equal selected capacity; report
-actual populations and computational work. Choose matching controls during
-development. Negative outcomes belong in the report.
+Begin with two development FWI cases exposing distinct structure: inclined thin
+layers and a faulted or curved model. Include both positive and negative
+contrasts, coverage limitations and a nontrivial initial model. Then freeze a
+held-out matrix spanning at least three distinct structures and three recorded
+random seeds per configuration. Determine final run counts from measured GPU
+cost, not from short CPU fixture timing.
 
-## Independent waveform evaluation
+Ablate the density mechanism only in explicitly archived research branches or
+external harnesses: fixed population as a control, clone/split contribution,
+pruning and field-change safeguards. Keep initialization and data identical,
+measure convergence and account for all work. Do not equate equal iteration
+counts with equal compute, capacity or effective regularization. A factorial
+study is useful if interactions matter; it is not evidence until run.
 
-The initial design is three new cases x two defensible starts x four arms:
-strong multiscale grid FWI, compact classical basis, scalar neural representation
-and adaptive Gaussians. These 24 primary fits exclude development and audits.
-Comparator adapters are future focused work; they are not included in this
-baseline repository.
+Compare at equal measured work and across accuracy/storage curves where
+possible. Report population history, full-covariance parameter counts, serialized
+field size, optimizer and wavefield memory, elapsed synchronized time, all
+forward/adjoint shot solves, and any recomputation. Report uncertainty across
+seeds and cases rather than selecting the best reconstruction.
 
-Add fixed-population Gaussian controls on preselected mechanism cases and grid
-FWI followed by compression of the recovered field. The compressor can use that
-recovered field, never true velocity or test waveforms. Count compression work.
-Choose one difficult acquisition/noise regime during development instead of a
-large unmotivated parameter sweep.
+## Independent acceptance and reporting
 
-Training waveforms drive optimization, regularization choices and topology.
-Validation selects checkpoints. Inspect test waveforms and reference velocities
-only after the frozen comparisons finish. Geological cases, not individual
-traces or seeds, determine the scope of generalization claims.
+After checkpoint selection, reload the field in a clean process, verify SPD and
+physical constraints, and propagate fresh waveforms. Independently recompute
+metrics from saved arrays. Report training, validation and test waveform errors
+separately from velocity RMSE/relative error. Include geological structure or
+interface metrics where the claim requires them, acquisition coverage, noise
+sensitivity and failure cases. A visually attractive image alone is insufficient.
 
-## Physical and computational verification
+Sampling checks should refine the same physical domain, assess interpolation
+and amplitude errors, and separately check waveform convergence. The covariance
+width floor does not certify alias-free summed fields or seismic resolution.
 
-Verify spatial, temporal and boundary convergence for the actual physical source/
-receiver policy and field scales. Preserve coordinates, integrated source
-strength, footprints, physical extent and output times. Require decreasing
-successive errors and less than 1% on final declared trace comparisons; disclose
-zero-signal handling and any excluded traces. Previously verified surveys do not
-automatically certify new ones.
-
-Measure decode/backward, search/transfers, topology, propagation, total wall time
-and peak GPU/host memory. Count actual forward/adjoint shot solves, including
-generation, validation when separate, forecasts, recovery, recomputation,
-independent checks and any pretraining. Equal epochs are not equal work.
-
-The [RTX 4060 plan](GPU_CAMPAIGN.md) specifies the hardware pilot and next
-implementation milestones. Do not infer inversion speed from decoder-only timing
-or use small correctness fixtures as scientific fits.
-
-## Deliverables
-
-Provide accuracy/storage/time curves, causal controls, waveform-only comparisons
-and one substantial application with independent validation. Each fitted case
-needs configurations, identities, complete work, loss trajectories and an
-independent saved-field/propagation audit. Store these artifacts externally to
-Git with a manifest; the source repository remains small.
-
-A genuine 3D representation/scaling example supports dimensional generality.
-Practical 3D inversion claims require application-scale 3D FWI. Learned priors,
-additional properties and extra applications remain optional.
+A publication claim requires completed comparative evidence, justified physical
+assumptions, reproducible methods and a clear contribution relative to prior
+Gaussian/RBF and implicit-field inversion literature. Passing the software
+release gate cannot certify a Nature paper or any journal's acceptance.

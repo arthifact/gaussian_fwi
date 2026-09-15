@@ -6,11 +6,11 @@ from dataclasses import replace
 from pathlib import Path
 
 import torch
-from test_dynamic import assert_exact, configuration, problem
+from _problems import assert_exact, configuration, problem
 
-import dynamic_refinement as fwi
-from fwi_core import GridSpec
+import gaussian_fwi as fwi
 from gaussian_fwi import SamplingConfig, sample_on_grid, sampling_diagnostics
+from gaussian_fwi.core import GridSpec
 
 
 class PhysicalSamplingTests(unittest.TestCase):
@@ -53,13 +53,12 @@ class PhysicalSamplingTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "same physical domain"):
                 sample_on_grid(field, GridSpec((13,) * dimension, 6))
 
-    def test_sampling_floor_intersects_stage_limits_and_restart(self):
+    def test_sampling_floor_is_preserved_by_fit_and_restart(self):
         for dimension in (2, 3):
             original, data, partitions = problem(dimension)
             field = fwi.GaussianField(original.grid, background=(2100, 2600),
                                       sampling=SamplingConfig()).double()
-            cfg = replace(configuration(dimension), steps_per_stage=2,
-                          spatial_radius_schedule=(25, 5))
+            cfg = replace(configuration(dimension), steps_per_stage=2)
             with tempfile.TemporaryDirectory() as tmp:
                 root = Path(tmp)
                 report = fwi.invert(field, data, cfg, root / "fit", partitions=partitions)

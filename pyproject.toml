@@ -1,6 +1,6 @@
 [project]
 name = "gaussian-fwi"
-version = "0.2.0"
+version = "0.3.0"
 description = "Adaptive anisotropic Gaussian velocity fields for waveform inversion"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -31,13 +31,12 @@ requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["dynamic_refinement", "gaussian_fwi", "fwi_core"]
+packages = ["gaussian_fwi", "gaussian_fwi.core"]
 py-modules = ["run"]
 
 [tool.setuptools.package-data]
 gaussian_fwi = ["py.typed"]
-dynamic_refinement = ["py.typed", "README.md"]
-fwi_core = ["py.typed"]
+"gaussian_fwi.core" = ["py.typed"]
 
 [tool.ruff]
 target-version = "py312"
@@ -48,8 +47,8 @@ extend-exclude = ["results", ".venv"]
 select = ["E4", "E7", "E9", "F", "I"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["dynamic_refinement", "gaussian_fwi", "fwi_core"]
+known-first-party = ["gaussian_fwi"]
 
 [tool.fwi-verification]
-method = "dynamic_refinement"
-blocked-imports = ["scheduled_growth", "fwi_baselines", "fwi_experiments"]
+method = "gaussian_fwi"
+blocked-imports = ["dynamic_refinement", "fwi_core", "scheduled_growth", "fwi_baselines", "fwi_experiments", "gaussian_fwi.adaptation", "gaussian_fwi.density", "gaussian_fwi.trials"]

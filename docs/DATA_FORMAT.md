@@ -33,8 +33,8 @@ meaning when a grid is refined.
 Once acquisition and measured traces are prepared:
 
     import torch
-    from fwi_core import Observations
-    from fwi_core.io import load_observations, save_observations
+    from gaussian_fwi import Observations
+    from gaussian_fwi import load_observations, save_observations
 
     observations = Observations(acquisition, measured_traces.detach())
     partitions = {
@@ -58,7 +58,7 @@ For an externally recorded identity:
     )
 
 Finite physical source/receiver footprints use
-fwi_core.footprints.FootprintAcquisition and its versioned checkpoint schema.
+gaussian_fwi.core.footprints.FootprintAcquisition and its versioned checkpoint schema.
 The same I/O functions support point and footprint acquisitions. Runtime solve
 counters do not become observation identity.
 

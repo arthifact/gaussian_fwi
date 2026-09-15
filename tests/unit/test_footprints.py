@@ -5,14 +5,14 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from _problems import assert_exact
 from _support import refined_acquisition, verify_waveform_sampling
-from test_dynamic import assert_exact
 
-from fwi_core import Acquisition, GridSpec
-from fwi_core.footprints import FootprintAcquisition, GaussianFootprint, footprint_weights
-from fwi_core.identity import observation_sha256
-from fwi_core.io import load_observations
 from gaussian_fwi import GaussianField
+from gaussian_fwi.core import Acquisition, GridSpec
+from gaussian_fwi.core.footprints import FootprintAcquisition, GaussianFootprint, footprint_weights
+from gaussian_fwi.core.identity import observation_sha256
+from gaussian_fwi.core.io import load_observations
 
 
 class FootprintTests(unittest.TestCase):

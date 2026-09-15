@@ -1,31 +1,16 @@
-"""Trainable anisotropic Gaussian fields for wave-equation inversion."""
+"""One Gaussian FWI method with scheduled adaptive density control."""
 
-from .adaptation import AdaptationConfig
+from .core import Acquisition, GridSpec, Observations, Preprocessing, Regularization
+from .core.io import load_observations, save_observations
 from .decoder import decode
-from .density import DensityControlConfig
-from .field import GaussianField, GridSpec
+from .field import GaussianField
 from .inversion import InversionConfig, invert, resume
-from .refinement import RefinementConfig, RefinementController
+from .refinement import RefinementConfig
 from .sampling import SamplingConfig, sample_on_grid, sampling_diagnostics
-from .topology import EditRejected, GaussianTopology, TopologyEdit
-from .trials import TrainingScores
 
 __all__ = [
-    "AdaptationConfig",
-    "DensityControlConfig",
-    "decode",
-    "GaussianField",
-    "GaussianTopology",
-    "TopologyEdit",
-    "EditRejected",
-    "GridSpec",
-    "InversionConfig",
-    "RefinementConfig",
-    "RefinementController",
-    "SamplingConfig",
-    "TrainingScores",
-    "sample_on_grid",
-    "sampling_diagnostics",
-    "invert",
-    "resume",
+    "Acquisition", "GridSpec", "Observations", "Preprocessing", "Regularization",
+    "load_observations", "save_observations", "GaussianField", "InversionConfig",
+    "RefinementConfig", "invert", "resume", "decode", "SamplingConfig",
+    "sample_on_grid", "sampling_diagnostics",
 ]

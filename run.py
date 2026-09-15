@@ -11,30 +11,20 @@ from pathlib import Path
 
 import torch
 
-import dynamic_refinement
 import gaussian_fwi
-from fwi_core import Preprocessing, Regularization, WaveformObjective
-from fwi_core.checkpoint import prepare_output, save_json
-from fwi_core.footprints import FootprintAcquisition
-from fwi_core.io import load_observations
+from gaussian_fwi.core import Preprocessing, Regularization, WaveformObjective
+from gaussian_fwi.core.checkpoint import prepare_output, save_json
+from gaussian_fwi.core.footprints import FootprintAcquisition
+from gaussian_fwi.core.io import load_observations
 
 
 def configuration(profile, grid):
     """Validate method and field settings against the actual acquisition grid."""
     if not isinstance(profile, dict) or set(profile) != {
-        "method", "field", "inversion", "regularization", "preprocessing",
+        "field", "inversion", "regularization", "preprocessing",
     }:
-        raise ValueError("Profile requires method, field, inversion, regularization, preprocessing")
-    if profile["method"] == "direct":
-        config = dynamic_refinement.InversionConfig(**profile["inversion"])
-    elif profile["method"] == "scheduled":
-        config = gaussian_fwi.InversionConfig(**profile["inversion"])
-        if (any(x is not None for x in (config.refinement, config.adaptation, config.density_control))
-                or config.spatial_radius_schedule is not None
-                or any(level is None for level in config.levels)):
-            raise ValueError("Scheduled mode requires explicit lattices and no topology controller")
-    else:
-        raise ValueError("Method must be direct or scheduled")
+        raise ValueError("Profile requires field, inversion, regularization, preprocessing")
+    config = gaussian_fwi.InversionConfig(**profile["inversion"])
     settings = profile["field"]
     if (not {"background", "bounds"} <= set(settings)
             or not set(settings) <= {"background", "bounds", "sampling", "backend"}):
@@ -51,8 +41,7 @@ def fit_observations(observations, partitions, profile, output):
     field = gaussian_fwi.GaussianField(
         observations.acquisition.grid, **profile["field"],
     ).to(observations.traces)
-    engine = dynamic_refinement if profile["method"] == "direct" else gaussian_fwi
-    report = engine.invert(
+    report = gaussian_fwi.invert(
         field, observations, config, output, partitions=partitions,
         regularization=regularization, preprocessing=preprocessing,
     )
@@ -89,9 +78,9 @@ def run_case(observation_path, profile, output):
     output = prepare_output(output)
     source_root = Path(__file__).resolve().parent
     sources = [Path(__file__).resolve()]
-    for package in (dynamic_refinement, gaussian_fwi):
+    for package in (gaussian_fwi,):
         sources.extend(Path(package.__file__).resolve().parent.glob("*.py"))
-    import fwi_core
+    import gaussian_fwi.core as fwi_core
 
     sources.extend(Path(fwi_core.__file__).resolve().parent.glob("*.py"))
     identities = {str(path.relative_to(source_root)): hashlib.sha256(path.read_bytes()).hexdigest()
@@ -126,7 +115,7 @@ def run_case(observation_path, profile, output):
                for name, digest in identities.items()):
             raise RuntimeError("Runtime source changed during the fit")
         result = {
-            "status": "complete", "method": profile["method"],
+            "status": "complete", "method": report["method"],
             "gaussians": report["gaussians"], "parameters": report["parameters"],
             "fit_solver_calls": fit_counts, "verification_solver_calls": verification_counts,
             "fit_shot_solves": {key: value * shot_multiplier for key, value in fit_counts.items()},

@@ -51,7 +51,7 @@ B(u)=v_{\min}+s\log(1+e^{(u-v_{\min})/s})
                  -s\log(1+e^{(u-v_{\max})/s}),\qquad s>0.
 \]
 
-The implementation uses a numerically stable equivalent. Current profiles use
+The implementation uses a numerically stable equivalent. The baseline profile uses
 \(v_{\min}=1500\), \(v_{\max}=4500\) and \(s=20\), all in m/s. The two
 background endpoints remain trainable. Parameter storage is
 \(K[d+d(d+1)/2+1]+2\) scalars: **6K+2 in 2D**, **10K+2 in 3D**. Report
@@ -142,14 +142,14 @@ work. Geometry projection, discrete topology choices and checkpoint selection
 are not differentiated through. The acoustic gradient is that of the declared
 discretization; correctness of its derivative does not prove physical adequacy.
 
-The current runner profiles use `sparse_fused`: centers, log widths, shears and
+The current runner profile uses `sparse_fused`: centers, log widths, shears and
 amplitudes are concatenated for one sparse evaluation. These are differentiable
 tensor operations, so each original Parameter and its Adam history remain in
 place. The mathematical field is the same, but floating-point summation order
 changes. Fused exports use field format v3; older block-wise sparse and dense
 fields retain their existing paths for exact historical replay.
 
-## Property 3: inactive insertion preserves the field
+## Property 3: zero-amplitude seeding preserves the field
 
 Insert any valid kernel with amplitude \(a_{K+1}=0\), keeping all previous
 parameters and numerical settings fixed.
@@ -172,60 +172,46 @@ nonzero amplitude is learned. Insertion therefore offers new descent directions
 without an immediate field jump. It guarantees neither a nonzero useful gradient
 nor improvement after any particular optimizer step.
 
-The current controller inserts diagonal covariance and permits subsequent full-
-covariance learning. The field-preservation argument itself only needs a valid
-kernel and zero amplitude.
+The single inversion method seeds one diagonal-covariance lattice at zero
+amplitude before optimization, then permits full-covariance learning. Its density
+controller subsequently uses clone/split/prune; it does not repeatedly insert
+zero-amplitude lattices. The zero-amplitude proof applies to initialization,
+not to these later density edits.
 
-Splitting, cloning, merging and pruning generally change the field. Do not extend
-the insertion proof to those operations or to changing the width/bounding policy.
+## Discrete density control and evidence boundary
 
-## Discrete adaptation and evidence boundary
+The [algorithm specification](ALGORITHM.md) gives the exact periodic gradient
+statistic, sampled binary split, clone and signed-amplitude pruning definitions.
+All accepted edits in an event share one cumulative propagation-grid velocity
+bound and one atomic transaction. Split children inherit signed amplitudes and
+have covariance divided by 1.6 squared. These operations do not preserve moments
+or pointwise fields and do not guarantee reduced waveform loss.
 
-The direct controller uses the regularized training gradient. It observes that
-gradient before an ordinary Adam update and scores proposals after the update,
-so the gradient is one update old. It ranks local proposals, enforces geometry,
-age and capacity limits, and applies at most the configured number of compatible
-edits. Prediction includes possible learning by newborn kernels; it is not a
-measured waveform decrease. Optional recovery trials compare edited and unedited
-anchors using training data and counted work. They are disabled in the current
-direct profile.
-
-During one event, every accepted edit is checked against the same pre-event
-velocity on the actual propagation-grid points. Thus the cumulative sampled
-change remains within the configured limit (25 m/s in the current profile),
-rather than receiving a new allowance for each edit. This does not bound changes
-between those points or across successive events. An individual failed edit
-restores the field, gradients, optimizer state and identity map atomically.
-A rejected recovery trial restores its unedited anchor, while deliberately
-retiring any newly allocated IDs so the audit history remains unambiguous.
-
-Training waveforms drive gradients and topology decisions. Validation chooses
-the stage checkpoint; test waveforms and synthetic true velocity are scored
-after fitting. Four stages use the cumulative band sets ending at 4, 7, 12 and
-20 Hz. The published development profiles allocate 1,000 ordinary updates each. Equal total updates across another
-frequency schedule do not imply equal trajectories, work or convergence.
+Training data drive gradients and density decisions. Validation selects only
+within the final fixed-population phase of each frequency stage. Test waveforms
+and reference velocity cannot influence this process. The default four stages
+use cumulative cutoffs 4, 7, 12 and 20 Hz, with 1,000 updates per stage. These
+allowances do not establish convergence.
 
 For an ideal individual Gaussian, the optional width floor
 \(h\sqrt{-2\log\epsilon}/\pi\) limits its normalized Fourier response at
 angular frequency \(\pi/h\). It does not certify alias-free sampling of the
-tapered, summed and bounded field, nor resolve seismic structure at that scale.
-Field sampling and waveform propagation require separate diagnostics.
+tapered, summed and bounded field, nor seismic resolution at that scale. Field
+sampling and waveform propagation require separate diagnostics.
 
-The three properties justify a valid differentiable representation and a
-specific safe insertion mechanism. Accuracy versus storage, the causal benefit
-of adaptation, practical inversion quality and computational cost are empirical
-questions in the paper plan. They cannot be inferred from these proofs.
+The three properties establish a differentiable representation, full covariance,
+bounds and inactive initialization. Accuracy/storage tradeoffs, density-control
+benefit, inversion quality and cost are empirical questions.
 
 ## Implementation and independent checks
 
-| Claim | Implementation | Independent acceptance already available |
+| Claim | Implementation | Independent check |
 |---|---|---|
-| Kernel and first derivatives | [raster.py](../gaussian_fwi/raster.py), [decoder.py](../gaussian_fwi/decoder.py) | Scalar kernel formula, finite differences, dense/sparse adjoints and acoustic parameter-family directional derivatives. |
-| Covariance, bounds and storage | [field.py](../gaussian_fwi/field.py) | NumPy eigenvalues, independent covariance solves, physical-query values and parameter counts. |
-| Zero-amplitude birth and state | [topology.py](../gaussian_fwi/topology.py), [refinement.py](../gaussian_fwi/refinement.py) | Field preservation, survivor/newborn Adam states and exact rollback invariants. |
-| Selection and data separation | [inversion.py](../gaussian_fwi/inversion.py) | Held-out perturbation tests, stage restart and saved-field replay. |
-| Width policy | [sampling.py](../gaussian_fwi/sampling.py) | Analytic Gaussian sampling, principal-width checks and explicit interpolation counterexamples. |
+| Kernel and derivatives | [raster.py](../gaussian_fwi/raster.py), [decoder.py](../gaussian_fwi/decoder.py) | Scalar formulas, finite differences, dense/sparse adjoints and acoustic directional derivatives |
+| Covariance, bounds and storage | [field.py](../gaussian_fwi/field.py) | NumPy eigenvalues, independent covariance solves, physical queries and parameter counts |
+| Density edits and state | [_topology.py](../gaussian_fwi/_topology.py), [refinement.py](../gaussian_fwi/refinement.py) | Sampling distribution, survivor/newborn Adam and exact transaction rollback |
+| Selection and separation | [inversion.py](../gaussian_fwi/inversion.py) | Held-out perturbations, stage restart and saved-field replay |
+| Width policy | [sampling.py](../gaussian_fwi/sampling.py) | Analytic Gaussian sampling and explicit interpolation counterexamples |
 
-Run the checks described in the [engineering specification](ENGINEERING_SPEC.md)
-to verify these software properties. The [baseline protocol](BASELINE_PROTOCOL.md)
-defines the separate scientific evaluation.
+See [verification](../tests/README.md) and the separate
+[scientific protocol](BASELINE_PROTOCOL.md).

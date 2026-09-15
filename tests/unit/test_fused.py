@@ -7,12 +7,12 @@ from pathlib import Path
 
 import numpy as np
 import torch
-from test_dynamic import assert_exact, configuration, problem
+from _problems import assert_exact, configuration, problem
 from test_topology import initialized_field
 
-import dynamic_refinement as fwi
+import gaussian_fwi as fwi
 from gaussian_fwi import GaussianField, GridSpec
-from gaussian_fwi.topology import EditRejected
+from gaussian_fwi._topology import EditRejected
 
 
 def numpy_values(field, points):
@@ -99,8 +99,11 @@ class FusedTests(unittest.TestCase):
             parameters = tuple(field.parameters())
             states = {p: deepcopy(optimizer.state[p]) for p in parameters}
             before = field().detach()
-            topology.apply(topology.insert(field.background.new_full((d,), 40), 12), optimizer,
-                           step=5, max_field_change=1000, learning_rates={"amplitude_lr": 4.0})
+            block = field.add_gaussians(field.background.new_full((1, d), 40),
+                                        field.background.new_full((1, d), 12))
+            for group in block.parameter_groups():
+                optimizer.add_param_group(group)
+            topology.register_appended(step=5)
             torch.testing.assert_close(field(), before, rtol=0, atol=0)
             self.assertTrue(all(a is b for a, b in zip(parameters, field.parameters())))
             for p in parameters:
@@ -109,7 +112,7 @@ class FusedTests(unittest.TestCase):
                 self.assertFalse(optimizer.state.get(p))
             before = field.checkpoint(), deepcopy(optimizer.state_dict()), topology.state_dict()
             with self.assertRaises(EditRejected):
-                topology.apply(topology.clone(0), optimizer, step=6, max_field_change=1e-12)
+                topology.apply_many([topology.clone(0)], optimizer, step=6, max_field_change=1e-12)
             assert_exact((field.checkpoint(), optimizer.state_dict(), topology.state_dict()), before)
 
     def test_versioned_export_and_empty_field_queries(self):

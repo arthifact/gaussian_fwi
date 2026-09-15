@@ -64,9 +64,10 @@ solves, before all extra categories.
 2. Measure 1,024/4,096/8,192 Gaussians on the intended domain, including
    fragmented fields, dense overlap and topology events. Use synchronized timing.
    Short timing/stress probes are engineering measurements, not research fits.
-3. Run complete long development pairs: fixed/adaptive representation of
-   inclined thin layers, then adaptive/grid waveform inversion. Expand to
-   faulted/curved structures and a second FWI development case.
+3. Run complete long development fits with the single Gaussian FWI method,
+   starting with inclined layers and then faulted/curved structures. Compare
+   against an independently accepted external grid-FWI reference. Any supervised
+   representation diagnostic is separately labeled and recorded.
 4. Freeze the [baseline protocol](BASELINE_PROTOCOL.md) and measured resource
    budget before the larger independent comparison matrix.
 
@@ -77,7 +78,15 @@ Test interrupted continuation across a topology event before long sessions.
 This capability remains to be implemented.
 
 Estimate each fit from measured full-update time by frequency stage, plus
-validation, topology/trials, checkpoint I/O and audits. Include failed runs and
+validation, topology, checkpoint I/O and audits. Include failed runs and
 development extensions in the total campaign cost. Continuous multi-day access
 supports sequential long runs; it does not guarantee that the entire campaign
 finishes within one reservation.
+
+## One density policy across budgets
+
+Use configs/baseline.json and the same optimize/refine/settle algorithm in every
+run. For convergence extensions, declare whether the absolute density window
+stays fixed or scales with the update allowance. The controlled settings are in
+[BASELINE_PROTOCOL.md](BASELINE_PROTOCOL.md). No second production controller is
+required. Tune all FWI-specific thresholds on development data before evaluation.

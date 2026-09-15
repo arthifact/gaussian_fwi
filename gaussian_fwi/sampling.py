@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import torch
 from torch.nn import functional as F
 
-from fwi_core.geometry import GridSpec
+from gaussian_fwi.core.geometry import GridSpec
 
 if TYPE_CHECKING:
     from .field import GaussianField

@@ -8,8 +8,10 @@ from pathlib import Path
 from urllib.parse import unquote, urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
-DIRECTORIES = ("dynamic_refinement", "gaussian_fwi", "fwi_core", "configs", "docs", "tests",
-               "tools", ".github")
+DIRECTORIES = ("gaussian_fwi", "configs", "docs", "tests", "tools", ".github")
+REMOVED_PATHS = ("dynamic_refinement", "fwi_core", "gaussian_fwi/adaptation.py",
+                 "gaussian_fwi/density.py", "gaussian_fwi/trials.py",
+                 "gaussian_fwi/directions.py", "configs/direct.json", "configs/scheduled.json")
 ROOT_FILES = ("README.md", "AGENTS.md", "CONTRIBUTING.md", "CITATION.cff", "LICENSE",
               "pyproject.toml", "requirements.txt", "requirements-dev.txt", "MANIFEST.in",
               "run.py", ".gitignore", ".gitattributes", ".editorconfig", ".python-version")
@@ -27,6 +29,11 @@ def source_files():
 def main():
     files = source_files()
     failures, link_count = [], 0
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text())
+    blocked = project["tool"]["fwi-verification"]["blocked-imports"]
+    for name in REMOVED_PATHS:
+        if (ROOT / name).exists():
+            failures.append(f"Obsolete public method remains: {name}")
     for path in files:
         if path.is_symlink():
             failures.append(f"Symlink cannot be published: {path.relative_to(ROOT)}")
@@ -41,8 +48,9 @@ def main():
             for node in ast.walk(ast.parse(text)):
                 modules = ([node.module or ""] if isinstance(node, ast.ImportFrom)
                            else [a.name for a in node.names] if isinstance(node, ast.Import) else [])
-                if any(name.split(".")[0] == "fwi_experiments" for name in modules):
-                    failures.append(f"Experimental dependency: {path.relative_to(ROOT)}")
+                if any(name == excluded or name.startswith(excluded + ".")
+                       for name in modules for excluded in blocked):
+                    failures.append(f"Removed/external dependency: {path.relative_to(ROOT)}")
         if path.suffix == ".md":
             for target in re.findall(r"\[[^\]]*\]\(([^)]+)\)", text):
                 target = target.strip("<>")
@@ -52,26 +60,27 @@ def main():
                 if local and not (path.parent / local).exists():
                     failures.append(f"Broken link: {path.relative_to(ROOT)} -> {target}")
                 link_count += 1
-    project = tomllib.loads((ROOT / "pyproject.toml").read_text())
     assert project["project"]["name"] == "gaussian-fwi"
     assert set(project["tool"]["setuptools"]["packages"]) == {
-        "gaussian_fwi", "dynamic_refinement", "fwi_core",
+        "gaussian_fwi", "gaussian_fwi.core",
     }
-    profiles = {}
-    for method in ("direct", "scheduled"):
-        profile = json.loads((ROOT / "configs" / f"{method}.json").read_text())
-        config = profile["inversion"]
-        assert profile["method"] == method and profile["field"]["backend"] == "sparse_fused"
-        assert config["steps_per_stage"] == 1000 and config["validation_interval"] == 25
-        profiles[method] = len(config["cutoffs"]) * config["steps_per_stage"]
-        assert profiles[method] == 4000
+    assert {p.name for p in (ROOT / "configs").glob("*.json")} == {"baseline.json"}
+    profile = json.loads((ROOT / "configs/baseline.json").read_text())
+    assert set(profile) == {"field", "inversion", "regularization", "preprocessing"}
+    config = profile["inversion"]
+    assert profile["field"]["backend"] == "sparse_fused"
+    assert config["steps_per_stage"] == 1000 and config["validation_interval"] == 25
+    assert len(config["cutoffs"]) * config["steps_per_stage"] == 4000
+    assert "refinement" in config
+    assert not set(config).intersection({"levels", "adaptation", "density_control"})
     ignored = (ROOT / ".gitignore").read_text().splitlines()
     for directory in ("results/", "data/", "models/", "archive/", "experiments/"):
         assert directory in ignored, directory
     if failures:
         raise AssertionError("\n".join(failures))
     print(json.dumps({"passed": True, "source_files": len(files), "local_links": link_count,
-                      "profile_total_updates": profiles, "scientific_runs": 0}, indent=2))
+                      "profile_total_updates": {"baseline": 4000},
+                      "scientific_runs": 0}, indent=2))
 
 
 if __name__ == "__main__":
