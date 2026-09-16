@@ -64,14 +64,10 @@ counters do not become observation identity.
 
 ## Dataset preparation and evaluation
 
-The five preserved [prepared development models](../models/README.md) are
-included in this repository. Keep additional geological datasets and generated
-observations outside Git, under data/ or another local storage location. Record their provenance, rights, physical units,
+Keep geological datasets and generated observations outside Git, under data/ or
+another local storage location. Record their provenance, rights, physical units,
 source identities and generation cost in the external campaign record.
-These supplied arrays have been resized and velocity-normalized; their manifest
-does not specify grid spacing. Declare a physically consistent grid when
-generating observations. Their presence does not change the observation-only
-inversion input schema.
+This repository includes no prepared geological arrays.
 
 Generate synthetic observations separately from the inversion worker. Use the
 declared independent/finer propagation setup. The worker receives waveforms and

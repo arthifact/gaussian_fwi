@@ -43,8 +43,34 @@ class RunnerTests(unittest.TestCase):
             self.assertTrue(bool(report["topology_history"]))
             self.assertTrue((path / "sampling.json").is_file())
             before = data.acquisition.counts
-            run.verify_fit(fitted, data, report, path)
+            replay = {}
+            run.verify_fit(fitted, data, report, path, metrics=replay)
             self.assertEqual(data.acquisition.counts["forward"]-before["forward"], 1)
+            self.assertTrue(all(item["exact"] for item in replay.values()))
+            self.assertEqual(replay["prediction"]["relative_tolerance"], 0.)
+
+    def test_explicit_precision_preserves_source_identity_and_records_runtime_identity(self):
+        _, data, partitions = problem(dtype=torch.float32)
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "observations.pt"
+            save_observations(data, partitions, path)
+            before = path.read_bytes()
+            source_identity = data.content_identity()["sha256"]
+            loaded, split = load_observations(
+                path, expected_content_sha256=source_identity, device="cpu", dtype=torch.float64,
+            )
+            self.assertEqual(loaded.sha256, source_identity)
+            self.assertNotEqual(loaded.content_identity(), data.content_identity())
+            self.assertEqual(loaded.traces.dtype, torch.float64)
+            self.assertEqual(loaded.acquisition.source_amplitudes.dtype, torch.float64)
+            self.assertEqual(loaded.acquisition.source_locations.dtype, torch.int64)
+            torch.testing.assert_close(loaded.traces, data.traces.double(), rtol=0, atol=0)
+            self.assertTrue(all(value.dtype == torch.int64 for value in split.values()))
+            self.assertEqual(path.read_bytes(), before)
+            with self.assertRaisesRegex(ValueError, "precision"):
+                load_observations(path, dtype=torch.float16)
+            with self.assertRaisesRegex(ValueError, "device"):
+                load_observations(path, device="meta")
 
     def test_portable_bundle_identity_and_partition_rejection(self):
         _, data, partitions = problem()

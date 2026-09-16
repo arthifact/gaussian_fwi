@@ -16,6 +16,38 @@ from gaussian_fwi.core.io import load_observations
 
 
 class FootprintTests(unittest.TestCase):
+    def test_shot_batches_preserve_unequal_geometry_gradients_identity_and_work(self):
+        torch.set_num_threads(2)
+        grid = GridSpec((25, 25), 5.)
+        time = torch.arange(100, dtype=torch.float64) * .0005
+        pulse = torch.exp(-((time-.02)/.006)**2)[None, None]
+        wave = pulse * torch.tensor([.7, 1.1, 1.6], dtype=torch.float64)[:, None, None]
+        base = Acquisition(grid, .0005, wave,
+                           torch.tensor([[[12, 9]], [[12, 12]], [[12, 15]]]),
+                           torch.tensor([[[12, 9], [12, 15]], [[12, 9], [12, 15]],
+                                         [[12, 12], [12, 12]]]), pml_width=8)
+        outputs, gradients = [], []
+        for size in (1, 2, 3):
+            acq = FootprintAcquisition(base, GaussianFootprint(5., 5.), shot_batch_size=size)
+            velocity = (2300 + 30*torch.sin(torch.arange(625, dtype=torch.float64)/40)).reshape(25, 25)
+            velocity.requires_grad_()
+            prediction = acq.simulate(velocity)
+            weights = torch.tensor([1., 2., 4.], dtype=torch.float64)[:, None, None]
+            gradient, = torch.autograd.grad((weights*prediction.square()).mean(), velocity)
+            outputs.append(prediction.detach())
+            gradients.append(gradient)
+            self.assertEqual(acq.counts, {"forward": 3, "adjoint": 3})
+            self.assertEqual(acq.batch_counts, {"forward": 3 if size == 1 else 2,
+                                              "adjoint": 3 if size == 1 else 2})
+            self.assertEqual(sum(s.counts["forward"] for s in acq.shots), 3)
+            restored = FootprintAcquisition.from_checkpoint(acq.checkpoint())
+            self.assertEqual(restored.shot_batch_size, size)
+            self.assertEqual(observation_sha256(acq, outputs[0]),
+                             observation_sha256(restored, outputs[0]))
+        for output, gradient in zip(outputs[1:], gradients[1:], strict=True):
+            torch.testing.assert_close(output, outputs[0], rtol=1e-10, atol=1e-12)
+            torch.testing.assert_close(gradient, gradients[0], rtol=1e-8, atol=1e-12)
+
     def owned_fixture(self):
         torch.set_num_threads(2)
         grid = GridSpec((25, 25), 5.)

@@ -7,7 +7,7 @@ docs/ALGORITHM.md for the exact translation and its empirical limitations.
 """
 
 import math
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 import torch
 
@@ -80,19 +80,52 @@ class RefinementController:
     are reset after every event and at each frequency change.
     """
 
-    def __init__(self, field, config, *, steps_per_stage, stage=0, topology_state=None):
+    def __init__(self, field, config, *, steps_per_stage, stage=0, topology_state=None, state=None):
         if not isinstance(config, RefinementConfig) or type(stage) is not int or stage < 0:
             raise ValueError("Invalid refinement configuration or frequency stage")
         config.validate_stage(steps_per_stage)
         if field.count > config.max_gaussians:
             raise ValueError("Initial population exceeds the Gaussian ceiling")
+        if state is not None:
+            expected = {"format", "config", "stage", "steps_per_stage", "last_step", "scores", "topology"}
+            if (not isinstance(state, dict) or set(state) != expected
+                    or state["format"] != "gaussian-fwi-controller-v1"
+                    or state["config"] != asdict(config) or state["stage"] != stage
+                    or state["steps_per_stage"] != steps_per_stage or topology_state is not None
+                    or type(state["last_step"]) is not int
+                    or not 0 <= state["last_step"] <= steps_per_stage):
+                raise ValueError("Invalid completed-update controller state")
+            topology_state = state["topology"]
         self.config, self.steps_per_stage, self.stage = config, steps_per_stage, stage
         self.topology = GaussianTopology(field, topology_state)
         self.start_step = stage * steps_per_stage
-        if any(age > self.start_step for ages in self.topology.last_edit_steps for age in ages):
+        last_step = 0 if state is None else state["last_step"]
+        if any(age > self.start_step + last_step for ages in self.topology.last_edit_steps for age in ages):
             raise ValueError("Topology history lies after the starting stage")
-        self.last_step, self.pending = 0, False
+        self.last_step, self.pending = last_step, False
         self.scores = {}
+        if state is not None:
+            ids = {i for block in self.topology.ids for i in block}
+            if not isinstance(state["scores"], dict):
+                raise ValueError("Invalid accumulated center gradients")
+            for kernel_id, value in state["scores"].items():
+                if (type(kernel_id) is not int or kernel_id not in ids
+                        or not isinstance(value, (list, tuple)) or len(value) != 2):
+                    raise ValueError("Invalid accumulated center gradients")
+                total, count = value
+                if (not isinstance(total, (int, float)) or not math.isfinite(total) or total < 0
+                        or type(count) is not int or not 0 < count <= last_step):
+                    raise ValueError("Invalid accumulated center gradients")
+                self.scores[kernel_id] = (float(total), count)
+
+    def state_dict(self):
+        """Portable state only at a completed update, after any atomic density event."""
+        if self.pending:
+            raise ValueError("Cannot save a controller with a pending optimizer update")
+        return {"format": "gaussian-fwi-controller-v1", "config": asdict(self.config),
+                "stage": self.stage, "steps_per_stage": self.steps_per_stage,
+                "last_step": self.last_step, "scores": dict(self.scores),
+                "topology": self.topology.state_dict()}
 
     @torch.no_grad()
     def observe(self, field):

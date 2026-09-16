@@ -86,13 +86,16 @@ class FootprintAcquisition:
     checkpoints are inspection copies; create a new wrapper to change physics.
     """
 
-    def __init__(self, base: Acquisition, footprint=GaussianFootprint()):
+    def __init__(self, base: Acquisition, footprint=GaussianFootprint(), *, shot_batch_size=1):
         if type(base) is not Acquisition:
             raise TypeError("A plain point-center Acquisition is required as the template")
         if isinstance(footprint, dict):
             footprint = GaussianFootprint(**footprint)
         if not isinstance(footprint, GaussianFootprint):
             raise TypeError("Expected a GaussianFootprint policy")
+        if type(shot_batch_size) is not int or shot_batch_size < 1:
+            raise ValueError("shot_batch_size must be a positive integer")
+        self._shot_batch_size = shot_batch_size
         self._base = base = Acquisition(**_acquisition_values(base))
         self._footprint = footprint
         self._shots, self._source_operators, self._receiver_operators = [], [], []
@@ -109,6 +112,25 @@ class FootprintAcquisition:
             ))
             self._source_operators.append(source)
             self._receiver_operators.append(receiver)
+        self._batches = []
+        first = 0
+        while first < len(self._shots):
+            template = self._shots[first]
+            stop = first + 1
+            while (stop < min(first + shot_batch_size, len(self._shots))
+                   and self._shots[stop].source_locations.shape[1] == template.source_locations.shape[1]
+                   and self._shots[stop].receiver_locations.shape[1] == template.receiver_locations.shape[1]):
+                stop += 1
+            members = self._shots[first:stop]
+            if len(members) == 1:
+                batch = template
+            else:
+                values = _acquisition_values(template)
+                for name in ("source_amplitudes", "source_locations", "receiver_locations"):
+                    values[name] = torch.cat([getattr(shot, name) for shot in members])
+                batch = Acquisition(**values)
+            self._batches.append((tuple(range(first, stop)), batch))
+            first = stop
 
     def __setattr__(self, name, value):
         if name in _ACQUISITION_FIELDS:
@@ -131,7 +153,16 @@ class FootprintAcquisition:
 
     @property
     def shots(self):
-        return tuple(_acquisition_copy(shot) for shot in self._shots)
+        result = [_acquisition_copy(shot) for shot in self._shots]
+        for ids, batch in self._batches:
+            for index in ids:
+                result[index].forward_calls = batch.forward_calls
+                result[index].adjoint_calls = batch.adjoint_calls
+        return tuple(result)
+
+    @property
+    def shot_batch_size(self):
+        return self._shot_batch_size
 
     @property
     def source_operators(self):
@@ -149,17 +180,49 @@ class FootprintAcquisition:
 
     @property
     def counts(self):
-        return {key: sum(shot.counts[key] for shot in self._shots) for key in ("forward", "adjoint")}
+        return {key: sum(len(ids)*batch.counts[key] for ids, batch in self._batches)
+                for key in ("forward", "adjoint")}
 
-    def simulate(self, velocity):
-        return torch.stack([torch.sparse.mm(weights, shot.simulate(velocity)[0])
-                            for shot, weights in zip(self._shots, self._receiver_operators)])
+    @property
+    def batch_counts(self):
+        return {key: sum(batch.counts[key] for _, batch in self._batches)
+                for key in ("forward", "adjoint")}
+
+    def simulate(self, velocity, *, wavefield_storage="device", storage_path=None):
+        predictions = [None] * len(self._shots)
+        for ids, batch in self._batches:
+            traces = batch.simulate(velocity, wavefield_storage=wavefield_storage, storage_path=storage_path)
+            for index, trace in zip(ids, traces, strict=True):
+                predictions[index] = torch.sparse.mm(self._receiver_operators[index], trace)
+        return torch.stack(predictions)
+
+    def simulate_batches(self, velocity, *, wavefield_storage="device", storage_path=None):
+        """Yield contiguous logical-shot slices and their differentiable traces.
+
+        Consumers can finish backward for one batch before requesting the next.
+        The ordinary simulator retains every batch graph until its backward.
+        Both paths use exactly the same physical operators and work counters.
+        """
+        for ids, batch in self._batches:
+            traces = batch.simulate(velocity, wavefield_storage=wavefield_storage, storage_path=storage_path)
+            prediction = torch.stack([
+                torch.sparse.mm(self._receiver_operators[index], trace)
+                for index, trace in zip(ids, traces, strict=True)
+            ])
+            # Do not pin the nodal trace storage in this suspended generator
+            # after the consumer has finished backward for the current batch.
+            del traces
+            yield slice(ids[0], ids[-1] + 1), prediction
+            del prediction
 
     def checkpoint(self):
         base = _acquisition_values(self._base)
         base["grid"] = asdict(self.grid)
-        return {"format": "gaussian-fwi-footprint-acquisition-v1", "base": base,
-                "footprint": asdict(self._footprint)}
+        result = {"format": "gaussian-fwi-footprint-acquisition-v1", "base": base,
+                  "footprint": asdict(self._footprint)}
+        if self.shot_batch_size != 1:
+            result["shot_batch_size"] = self.shot_batch_size
+        return result
 
     @classmethod
     def from_checkpoint(cls, payload):
@@ -167,4 +230,5 @@ class FootprintAcquisition:
             raise ValueError("Unknown footprint acquisition format")
         base = dict(payload["base"])
         base["grid"] = GridSpec(**base["grid"])
-        return cls(Acquisition(**base), GaussianFootprint(**payload["footprint"]))
+        return cls(Acquisition(**base), GaussianFootprint(**payload["footprint"]),
+                   shot_batch_size=payload.get("shot_batch_size", 1))

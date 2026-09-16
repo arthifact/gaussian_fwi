@@ -19,9 +19,8 @@ sampled velocity-change limit and roll back atomically. Sampled splits do not
 preserve moments or pointwise fields. Count actual forward/adjoint solves;
 a gradient score is not a measured loss reduction.
 
-Keep results, additional datasets, archives, credentials and unrelated
-experimental modules out of Git. The five owner-authorized prepared model arrays
-and their manifest in models/ are tracked exceptions; preserve their bytes. Never overwrite a fit or import another Gaussian-FWI checkout.
+Keep results, datasets, archives, credentials and unrelated experimental modules
+out of Git. Never overwrite a fit or import another Gaussian-FWI checkout.
 Follow docs/BASELINE_PROTOCOL.md and docs/GPU_CAMPAIGN.md for research budgets.
 Small numerical fixtures are software checks, not paper-scale fits.
 

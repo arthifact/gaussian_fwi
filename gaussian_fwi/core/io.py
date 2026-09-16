@@ -31,8 +31,22 @@ def _partitions(partitions, receivers):
 
 def load_observations(
     source: str | Path | BinaryIO, *, expected_content_sha256: str | None = None,
+    device: str | torch.device = "cpu", dtype: torch.dtype | None = None,
+    shot_batch_size: int | None = None,
 ) -> tuple[Observations, dict[str, torch.Tensor]]:
-    """Load a strict CPU bundle, optionally checking its physical content identity."""
+    """Validate a portable bundle, then explicitly move/cast its runtime tensors.
+
+    The optional expected hash checks the stored CPU bundle before conversion.
+    ``sha256`` retains that source identity; ``content_identity`` identifies the
+    actual runtime precision. Device movement alone preserves content identity.
+    """
+    device = torch.device(device)
+    if device.type not in ("cpu", "cuda"):
+        raise ValueError("Observation device must be CPU or CUDA")
+    if dtype not in (None, torch.float32, torch.float64):
+        raise ValueError("Observation precision must be float32 or float64")
+    if shot_batch_size is not None and (type(shot_batch_size) is not int or shot_batch_size < 1):
+        raise ValueError("shot_batch_size must be a positive integer or None")
     bundle = torch.load(source, map_location="cpu", weights_only=True)
     if not isinstance(bundle, dict) or set(bundle) != {"acquisition", "traces", "partitions"}:
         raise ValueError("Observation bundle keys must be acquisition, traces and partitions")
@@ -47,6 +61,31 @@ def load_observations(
     identity = observations.content_identity()["sha256"]
     if expected_content_sha256 is not None and identity != expected_content_sha256:
         raise ValueError("Observation content hash mismatch")
+    if device.type != "cpu" or dtype not in (None, observations.traces.dtype):
+        def convert(value):
+            if isinstance(value, torch.Tensor):
+                precision = dtype if value.is_floating_point() and dtype is not None else value.dtype
+                return value.to(device=device, dtype=precision)
+            if isinstance(value, dict):
+                return {key: convert(item) for key, item in value.items()}
+            return value
+
+        values = convert(dict(bundle["acquisition"]))
+        if "format" in values:
+            acquisition = FootprintAcquisition.from_checkpoint(values)
+        else:
+            values["grid"] = GridSpec(**values["grid"])
+            acquisition = Acquisition(**values)
+        observations = Observations(acquisition, convert(bundle["traces"]))
+        bundle["partitions"] = convert(bundle["partitions"])
+    if shot_batch_size is not None:
+        if isinstance(observations.acquisition, FootprintAcquisition):
+            acquisition = FootprintAcquisition(observations.acquisition.base,
+                                               observations.acquisition.footprint,
+                                               shot_batch_size=shot_batch_size)
+            observations = Observations(acquisition, observations.traces)
+        elif shot_batch_size != 1:
+            raise ValueError("Explicit shot grouping requires a finite-footprint acquisition")
     observations.sha256 = identity
     return observations, bundle["partitions"]
 

@@ -1,9 +1,10 @@
 # Adaptive Gaussian velocity fields: methods and short proofs
 
 This note describes the implementation and three mathematical properties of
-the Gaussian representation. It contains no
-claim of superior reconstruction, convergence or novelty by itself. The
-[paper plan](BASELINE_PROTOCOL.md) defines the empirical questions.
+the Gaussian representation: physical bounds and full covariance,
+fixed-population derivatives, and field-preserving inactive initialization.
+These support the [representation-focused research direction](RESEARCH_DIRECTION.md).
+The [evaluation protocol](BASELINE_PROTOCOL.md) defines the application evidence.
 
 ## Field and units
 
@@ -149,6 +150,48 @@ place. The mathematical field is the same, but floating-point summation order
 changes. Fused exports use field format v3; older block-wise sparse and dense
 fields retain their existing paths for exact historical replay.
 
+### Exact survey objective under shot accumulation
+
+Let a survey have \(N_s\) shots and let \(\mathcal B\) partition them into
+contiguous batches. Each shot has the same receiver/time dimensions. For one
+frequency band, denote the weighted residual by \(e_{srt}\) and the fixed
+full-survey training-target energy by \(D\). The implemented objective is
+
+\[
+\ell=\frac{1}{D N_s N_r N_t}\sum_{s,r,t}e_{srt}^2
+    =\sum_{B\in\mathcal B}\frac{|B|}{N_s}
+      \frac{\operatorname{mean}_{s\in B,r,t}e_{srt}^2}{D}.
+\]
+
+The identity follows by partitioning a finite sum. An unequal final batch
+therefore receives its fraction of the shot count. Every batch uses the same
+survey denominator and the original training-derived trace weights. The same
+identity holds for the average over active cumulative frequency bands.
+
+With a detached velocity leaf \(\bar v=v_\theta\), backward through each
+acoustic batch accumulates \(g_v=\sum_B\nabla_{\bar v}\ell_B\). The field
+receives one vector-Jacobian product:
+
+\[
+\nabla_\theta J=(\partial_\theta v_\theta)^\top g_v
+ +\nabla_\theta\big[R(v_\theta)+R_{\rm raw}(u_\theta)\big].
+\]
+
+One Adam update and one density-gradient observation follow the complete sum.
+Regularization appears once. Acoustic wavefields can be released after each
+batch's backward while the decoder graph survives until that final product.
+Uncompressed device, host or disk wavefield storage changes storage placement;
+the discrete physics, temporal sampling and physical solve count stay fixed.
+This is an exact-arithmetic identity. Floating-point reduction order can change,
+so independent value, gradient and optimizer-state comparisons remain necessary.
+
+One full training update costs \(N_s\) forward and \(N_s\) adjoint shot
+solves with these storage modes. Batch-call counts and additional verification
+forwards are reported separately. Survey targets and detached predictions remain
+resident, so accumulation bounds live wavefield storage without making total
+memory independent of survey size. See [runtime options](API.md) and the
+[measured resource checks](GPU_CAMPAIGN.md).
+
 ## Property 3: zero-amplitude seeding preserves the field
 
 Insert any valid kernel with amplitude \(a_{K+1}=0\), keeping all previous
@@ -211,7 +254,18 @@ benefit, inversion quality and cost are empirical questions.
 | Covariance, bounds and storage | [field.py](../gaussian_fwi/field.py) | NumPy eigenvalues, independent covariance solves, physical queries and parameter counts |
 | Density edits and state | [_topology.py](../gaussian_fwi/_topology.py), [refinement.py](../gaussian_fwi/refinement.py) | Sampling distribution, survivor/newborn Adam and exact transaction rollback |
 | Selection and separation | [inversion.py](../gaussian_fwi/inversion.py) | Held-out perturbations, stage restart and saved-field replay |
+| Full-survey accumulation | [physics.py](../gaussian_fwi/core/physics.py), [footprints.py](../gaussian_fwi/core/footprints.py) | Unequal batches, finite differences, full-gradient/Adam comparisons and nodal-trace lifetime checks |
 | Width policy | [sampling.py](../gaussian_fwi/sampling.py) | Analytic Gaussian sampling and explicit interpolation counterexamples |
 
 See [verification](../tests/README.md) and the separate
 [scientific protocol](BASELINE_PROTOCOL.md).
+
+Gaussian velocity bases have prior waveform-inversion uses, including the
+fixed Gaussian search space in Section 3.5.2 of
+[Borcea et al., SIAM Review (2024)](https://arxiv.org/html/2302.05988v2).
+The mathematical properties above do not establish representation novelty.
+The institutional abstract of
+[Peters's UFRJ thesis (2014)](https://coc.ufrj.br/lista-teses-de-doutorado/tecnicas-de-parametrizacao-e-estabilizacao-para-o-problema-da-recuperacao-de-propriedades-fisicas-da-subsuperficie-por-meio-de-dados-sismicos/)
+also describes compact-support RBF velocity models and adaptive reparameterization.
+Claims about adaptive geometry and topology require application-specific
+evidence and controls that isolate the claimed capability.

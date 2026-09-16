@@ -16,6 +16,7 @@ htmlcov/
 results/
 outputs/
 data/
+models/
 archive/
 experiments/
 fwi_experiments/
@@ -32,16 +33,6 @@ fwi_experiments/
 *.log
 *.zip
 *.whl
-
-# Preserved development models explicitly included with this repository
-/models/*
-!/models/README.md
-!/models/manifest.json
-!/models/bp2004.npy
-!/models/marmousi.npy
-!/models/overthrust.npy
-!/models/seam.npy
-!/models/sigsbee2a.npy
 
 # Machine-local settings and credentials
 .env

@@ -6,6 +6,11 @@ The method fits a continuous signed Gaussian velocity field to acoustic
 waveforms. It uses one optimization loop with periodic adaptive density control
 and a final fixed-population interval in each frequency stage.
 
+The active [research direction](RESEARCH_DIRECTION.md) studies this explicit
+representation as a foundation for macro models and local detail. That direction
+does not change the implemented algorithm below; geological priors and measured
+alternative-model trials remain separately specified future extensions.
+
 Kerbl et al. introduced interleaved Gaussian optimization and density control
 for radiance fields. Their method clones small high-gradient Gaussians, splits
 large ones and removes low-opacity components. Its image reconstruction results
@@ -39,7 +44,7 @@ that the seismic and optical objectives are identical.
 ## Continuous optimization
 
 The [mathematical specification](METHODS.md) defines the field, physical units,
-kernel, bounds and derivatives. At stage (s), let (mathcal B_s) contain all
+kernel, bounds and derivatives. At stage \(s\), let \(\mathcal B_s\) contain all
 frequency cutoffs up to that stage. The training objective is
 
 \[
@@ -47,7 +52,7 @@ J_s(\theta)=\frac{1}{|\mathcal B_s|}\sum_{f\in\mathcal B_s}
  L_{T,f}(A_h(v_\theta),d_T)+R(v_\theta)+R_{\rm raw}(u_\theta).
 \]
 
-Only training receivers contribute to (J_s). `WaveformObjective` defines the
+Only training receivers contribute to \(J_s\). `WaveformObjective` defines the
 fixed data normalization, filtering and optional trace preprocessing. Each
 update uses all shots. The background, amplitudes, centers, log widths and
 shears are optimized with Adam, followed by physical geometry projection.
@@ -66,8 +71,8 @@ G_k=\frac{1}{n_k}\sum_{t=1}^{n_k}
 \]
 
 This is a mean of gradient norms across updates, not the norm of their mean.
-The gradient is with respect to a physical position in meters, so (G_k) has
-units (1/\mathrm m\) for this normalized objective. It includes regularization.
+The gradient is with respect to a physical position in meters, so \(G_k\) has
+units \(1/\mathrm m\) for this normalized objective. It includes regularization.
 The full-shot gradient is formed before taking the norm; this is not an average
 of separate per-shot norms or projected camera gradients. At an event, the
 statistic reflects pre-update gradients; edits use post-Adam projected geometry.
@@ -168,7 +173,8 @@ over other representations or a publication-level contribution. Density control
 is itself an active research topic; later work revises its allocation criteria.
 [Revising Densification in Gaussian Splatting, ECCV 2024](https://arxiv.org/abs/2404.06109)
 
-The [evaluation protocol](BASELINE_PROTOCOL.md) requires substantial converged
-runs, independent observations, appropriate external comparators, repeated
-seeds, uncertainty and negative cases. Software acceptance and scientific
-acceptance are separate gates.
+The [evaluation protocol](BASELINE_PROTOCOL.md) requires substantial runs,
+convergence assessment, independent observations, controls appropriate to the
+claim, repeated seeds and negative cases. External comparators are used for
+claims that require them. Software acceptance and application evidence are
+separate gates.
