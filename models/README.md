@@ -48,6 +48,35 @@ apparent velocity recovery. Note the confound before drawing conclusions: 240
 updates is 6% of the accepted 4,000-update budget and the loss was still
 descending, so this compares data conditions, not converged results.
 
+## Capacity is the variable worth showing
+
+`capacity_study.py` fits the same survey at several capacities. A surface spread
+cannot constrain velocity below roughly half its maximum offset, so errors are
+reported inside and outside that illuminated depth rather than as one number
+that hides the distinction.
+
+Measured on this model at a 240-update horizon, illuminated depth 300 m:
+
+| Capacity | Params | Params/cell | RMSE all | RMSE <300 m | RMSE >300 m | Roughness |
+|---|---|---|---|---|---|---|
+| initial | — | — | 512.8 | 231.4 | 648.0 | 0.0 |
+| 8x8 | 380 | 0.08 | 500.2 | 158.8 | 647.2 | 37.8 |
+| 16x16 | 1532 | 0.31 | 522.3 | 167.0 | 675.6 | 53.7 |
+| 32x32 | 6068 | 1.24 | 512.2 | 184.8 | 658.4 | 92.5 |
+
+All three reach the same waveform fit (final training bands within a few percent
+of 0.43 / 0.24 / 0.16 / 0.18). The extra 5,688 parameters buy no data fit: they
+are spent on noise and on structure in the unilluminated zone, where the
+63-Gaussian field instead stays at its prior. Note that 32x32 seeding gives
+1.24 parameters per grid cell — more freedom than a grid of the same model — so
+at that capacity the representation supplies no dimensionality reduction at all.
+
+This is regularization by parameterization, and it is not by itself evidence
+that the Gaussian field beats a conventional smoothness prior. Establishing that
+needs a control at equal smoothness, and a claim about *adaptive* allocation
+needs the density controller to be doing the placing, which uniform seeding does
+not test.
+
 One subtlety worth knowing if you change the modelling grid: Deepwave injects a
 source as `amplitude * dt²`, so refining the time step alone scales recorded
 amplitudes by `1/refinement²`. The generator compensates, and
