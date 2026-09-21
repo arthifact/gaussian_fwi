@@ -2,8 +2,10 @@
 
 The clone/split/prune cycle follows Kerbl et al. (ACM TOG, 2023, section 5).
 Physical training-objective center gradients replace projected image gradients.
-Signed velocity amplitudes replace optical opacity for bounded pruning. See
-docs/ALGORITHM.md for the exact translation and its empirical limitations.
+Signed velocity amplitudes replace optical opacity for bounded pruning. The
+gradient score is a proposal heuristic, and the field-change guard is sampled
+rather than an all-coordinate guarantee; :class:`RefinementConfig` documents
+each setting's units and limitations.
 """
 
 import math
