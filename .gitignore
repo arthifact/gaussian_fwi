@@ -16,7 +16,6 @@ htmlcov/
 results/
 outputs/
 data/
-models/
 archive/
 experiments/
 fwi_experiments/
@@ -46,3 +45,9 @@ fwi_experiments/
 .DS_Store
 Thumbs.db
 *.swp
+
+# Preserved development velocity models, explicitly shared with this repository
+!/models/
+!/models/*.npy
+!/models/*.json
+!/models/*.md
