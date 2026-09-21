@@ -3,10 +3,10 @@
     python models/make_observations.py models/marmousi.npy data/marmousi.pt
     python models/run_marmousi.py
 
-Traces are forward modelled with the same solver and grid the inversion uses, so
-this is a software demonstration on synthetic data under favourable conditions,
-not a field-data result. The reference array makes the data and scores the fit
-afterwards; it never enters the inversion.
+The bundle built by ``make_observations.py`` is modelled on a finer grid than
+the inversion uses, with added noise and a mismatched source wavelet, so this is
+not an inverse crime. It remains a synthetic acoustic experiment: the reference
+array makes the data and scores the fit afterwards, and never enters the fit.
 """
 
 import argparse
@@ -22,16 +22,23 @@ import gaussian_fwi as gfwi
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--observations", type=Path, default=Path("data/marmousi.pt"))
+    parser.add_argument("--observations", type=Path, default=Path("data/marmousi_real.pt"))
     parser.add_argument("--reference", type=Path, default=Path("models/marmousi.npy"))
-    parser.add_argument("--output", type=Path, default=Path("results/marmousi_baseline_4000"))
+    parser.add_argument("--output", type=Path, default=Path("results/marmousi"))
     parser.add_argument("--threads", type=int, default=10)
     parser.add_argument("--steps-per-stage", type=int, default=None,
                         help="Declared deviation from the accepted 1000 updates per stage")
     args = parser.parse_args()
 
-    profile = None if args.steps_per_stage is None else gfwi.baseline(
-        steps_per_stage=args.steps_per_stage)
+    # Velocity bounds deliberately do not bracket the reference exactly: the
+    # true range is not known in advance for a real survey.
+    overrides = {"field": {"bounds": [1400.0, 5000.0]}}
+    if args.steps_per_stage is not None:
+        overrides["steps_per_stage"] = args.steps_per_stage
+        overrides["validation_interval"] = 5
+        overrides["refinement"] = {"warmup_steps": 10, "interval": 10,
+                                   "stop_fraction": 0.5, "minimum_age": 10}
+    profile = gfwi.baseline(**overrides)
 
     start = time.perf_counter()
     fit = gfwi.run(args.observations, args.output, profile=profile, threads=args.threads)

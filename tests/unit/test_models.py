@@ -44,6 +44,35 @@ class ObservationBuildTests(unittest.TestCase):
             self.assertGreater(len(ids), 0, name)
             self.assertTrue(bool(((ids >= 0) & (ids < receivers)).all()), name)
 
+    def test_finer_modelling_grid_preserves_physical_trace_amplitudes(self):
+        """Deepwave injects a source as amplitude * dt^2.
+
+        Refining the modelling grid alone would scale recorded amplitudes by
+        1/refinement^2, and the fit would chase that artifact instead of the
+        physics. The generator compensates; this pins that it still does.
+        """
+        from make_observations import build
+
+        model = self.model()
+        ideal, _ = build(model, samples=200, shots=2, peak_hz=15.0, ideal=True)
+        refined, _ = build(model, samples=200, shots=2, peak_hz=15.0, refinement=2,
+                           signal_to_noise=None, source_error=0.0)
+        ratio = float(refined.traces.square().mean().sqrt()
+                      / ideal.traces.square().mean().sqrt())
+        self.assertAlmostEqual(ratio, 1.0, delta=0.3,
+                               msg=f"amplitude ratio {ratio:.3f}; compensation regressed")
+
+    def test_realistic_bundle_differs_from_the_self_consistent_one(self):
+        """The default conditions must actually perturb the data."""
+        from make_observations import build
+
+        model = self.model()
+        ideal, _ = build(model, samples=200, shots=2, peak_hz=15.0, ideal=True)
+        realistic, _ = build(model, samples=200, shots=2, peak_hz=15.0)
+        relative = float((realistic.traces - ideal.traces).norm() / ideal.traces.norm())
+        self.assertGreater(relative, 0.02, "default conditions left the data untouched")
+        self.assertLess(relative, 0.9, "default conditions destroyed the signal")
+
     def test_saved_bundle_reloads_with_matching_content_identity(self):
         from make_observations import build
 
