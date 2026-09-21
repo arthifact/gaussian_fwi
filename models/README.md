@@ -33,6 +33,21 @@ Together these leave roughly a 16% relative waveform difference from the
 self-consistent case. `--ideal` restores the inverse crime for comparison, which
 is the honest way to show how much of a result rests on it.
 
+Measured on this model at a deliberately short 240-update horizon, with matched
+bounds and profile, only the data conditions differing:
+
+| | Ideal (inverse crime) | Realistic |
+|---|---|---|
+| Velocity RMSE | 512.8 -> 395.8 m/s | 512.8 -> 512.2 m/s |
+| Final training waveform loss | ~1e-4 per band | 0.42 / 0.23 / 0.16 / 0.17 |
+
+Under the crime the misfit collapses to near machine precision because the
+operator is exactly invertible; under realistic conditions it floors at a noise
+and physics limit. At that horizon the crime accounts for essentially all of the
+apparent velocity recovery. Note the confound before drawing conclusions: 240
+updates is 6% of the accepted 4,000-update budget and the loss was still
+descending, so this compares data conditions, not converged results.
+
 One subtlety worth knowing if you change the modelling grid: Deepwave injects a
 source as `amplitude * dt²`, so refining the time step alone scales recorded
 amplitudes by `1/refinement²`. The generator compensates, and
