@@ -18,6 +18,7 @@ import torch
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from survey import draw_geometry, read_geometry  # noqa: E402
 
 import gaussian_fwi as gfwi  # noqa: E402
 
@@ -36,11 +37,13 @@ def main():
     parser.add_argument("--smoothed", type=Path, default=Path("results/tv_0.01"))
     parser.add_argument("--destination", type=Path,
                         default=Path("results/capacity_vs_tv.png"))
+    parser.add_argument("--observations", type=Path, default=Path("data/marmousi_real.pt"))
     parser.add_argument("--illuminated-m", type=float, default=300.0)
     parser.add_argument("--spacing", type=float, default=10.0)
     args = parser.parse_args()
 
     reference = np.load(args.reference).astype(np.float64)
+    sources, receivers = read_geometry(args.observations, args.spacing)
     boundary = int(args.illuminated_m / args.spacing)
     depth, width = reference.shape
     extent = (0, (width - 1) * args.spacing, (depth - 1) * args.spacing, 0)
@@ -75,7 +78,11 @@ def main():
         image = axis.imshow(field, cmap="viridis", vmin=float(reference.min()),
                             vmax=float(reference.max()), extent=extent, aspect="equal")
         axis.set(title=title, xlabel="x (m)", xticks=[0, 300, 600])
+        draw_geometry(axis, sources, receivers, label=column == 0)
         axis.axhline(args.illuminated_m, color="w", lw=1.1, ls=(0, (4, 3)))
+        if column == 0:
+            axis.legend(loc="lower left", fontsize=7.5, framealpha=.85,
+                        handletextpad=.2, borderpad=.3)
         if column:
             axis.tick_params(labelleft=False)
         else:
@@ -85,11 +92,11 @@ def main():
     labels = [name for name, _, _ in entries]
     colors = [color for _, _, color in entries]
     metrics = [
-        (f"Velocity RMSE above {args.illuminated_m:.0f} m\n(illuminated: lower is better)",
+        (f"Velocity RMSE above {args.illuminated_m:.0f} m\n(diving-wave coverage: lower is better)",
          [rmse(f, 0, boundary) for _, f, _ in entries], rmse(initial, 0, boundary), "m/s"),
-        (f"Velocity RMSE below {args.illuminated_m:.0f} m\n(no data: staying at the prior is correct)",
+        (f"Velocity RMSE below {args.illuminated_m:.0f} m\n(reflections only: staying at the prior is honest)",
          [rmse(f, boundary) for _, f, _ in entries], rmse(initial, boundary), "m/s"),
-        ("Field roughness\n(speckle: lower is smoother)",
+        ("Field roughness: mean |second difference|\n(speckle, m/s per sample: lower is smoother)",
          [roughness(f) for _, f, _ in entries], None, ""),
     ]
     bar_axes = lower.subplots(1, 3)

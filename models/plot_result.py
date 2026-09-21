@@ -15,6 +15,7 @@ import torch
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt  # noqa: E402
+from survey import draw_geometry, read_geometry  # noqa: E402
 
 import gaussian_fwi as gfwi  # noqa: E402
 
@@ -24,6 +25,7 @@ def main():
     parser.add_argument("run", type=Path, help="A finished run directory")
     parser.add_argument("reference", type=Path, help="The (z, x) reference array in m/s")
     parser.add_argument("destination", type=Path, help="Figure path")
+    parser.add_argument("--observations", type=Path, default=Path("data/marmousi_real.pt"))
     parser.add_argument("--spacing", type=float, default=10.0)
     args = parser.parse_args()
 
@@ -33,6 +35,7 @@ def main():
     initial = torch.load(args.run / "fit/predictions.pt", map_location="cpu",
                          weights_only=True)["initial_velocity"].cpu().numpy().astype(np.float64)
 
+    sources, receivers = read_geometry(args.observations, args.spacing)
     depth, width = reference.shape
     extent = (0, (width - 1) * args.spacing, (depth - 1) * args.spacing, 0)
     low, high = float(reference.min()), float(reference.max())
@@ -45,6 +48,9 @@ def main():
         image = axis.imshow(field, cmap="viridis", vmin=low, vmax=high, extent=extent,
                             aspect="equal")
         axis.set(xlabel="x (m)", title=title)
+        draw_geometry(axis, sources, receivers, label=axis is axes[0])
+    axes[0].legend(loc="lower left", fontsize=7.5, framealpha=.85,
+                   handletextpad=.2, borderpad=.3)
     axes[0].set_ylabel("z (m)")
     figure.colorbar(image, ax=axes[:3], label="Velocity (m/s)", shrink=.85)
 
@@ -52,6 +58,7 @@ def main():
     span = float(np.abs(difference).max())
     signed = axes[3].imshow(difference, cmap="RdBu_r", vmin=-span, vmax=span, extent=extent,
                             aspect="equal")
+    draw_geometry(axes[3], sources, receivers)
     rmse = float(np.sqrt((difference ** 2).mean()))
     axes[3].set(xlabel="x (m)", title=f"Recovered − reference, RMSE {rmse:.0f} m/s")
     figure.colorbar(signed, ax=axes[3], label="m/s", shrink=.85)

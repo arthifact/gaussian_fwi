@@ -20,6 +20,7 @@ from pathlib import Path
 
 import numpy as np
 import torch
+from survey import draw_geometry, read_geometry
 
 import gaussian_fwi as gfwi
 
@@ -30,7 +31,7 @@ def roughness(field):
                  + np.abs(np.diff(field, 2, axis=1)).mean())
 
 
-def figure(reference, initial, fits, destination, illuminated_m, spacing):
+def figure(reference, initial, fits, destination, illuminated_m, spacing, geometry=None):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
@@ -46,8 +47,13 @@ def figure(reference, initial, fits, destination, illuminated_m, spacing):
         image = axis.imshow(field, cmap="viridis", vmin=float(reference.min()),
                             vmax=float(reference.max()), extent=extent, aspect="equal")
         axis.set(xlabel="x (m)", title=title)
+        if geometry is not None:
+            draw_geometry(axis, *geometry, label=axis is axes[0])
         axis.axhline(illuminated_m, color="w", lw=1.1, ls=(0, (4, 3)))
     axes[0].set_ylabel("z (m)")
+    if geometry is not None:
+        axes[0].legend(loc="lower left", fontsize=7.5, framealpha=.85,
+                       handletextpad=.2, borderpad=.3)
     for axis in axes[1:]:
         axis.tick_params(labelleft=False)
     figure.colorbar(image, ax=axes, label="Velocity (m/s)", shrink=.85)
@@ -118,7 +124,7 @@ def main():
     rows = [baseline_row] + [{k: v for k, v in row.items() if k != "velocity"} for row in fits]
     (args.output / "capacity.json").write_text(json.dumps(rows, indent=2) + "\n")
     figure(reference, initial, fits, args.output / "capacity.png", args.illuminated_m,
-           args.spacing)
+           args.spacing, geometry=read_geometry(args.observations, args.spacing))
 
     header = f"{'capacity':>10}{'params':>8}{'/cell':>7}{'RMSE all':>10}"
     header += f"{'<' + str(int(args.illuminated_m)) + 'm':>9}{'>' + str(int(args.illuminated_m)) + 'm':>10}{'rough':>8}"
