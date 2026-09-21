@@ -3,7 +3,6 @@ import unittest
 import torch
 
 from gaussian_fwi.core import Acquisition, GridSpec, Observations
-from gaussian_fwi.core.footprints import FootprintAcquisition, GaussianFootprint
 
 
 class ObservationIdentityTests(unittest.TestCase):
@@ -13,13 +12,11 @@ class ObservationIdentityTests(unittest.TestCase):
                                   torch.tensor([[[12, 10], [12, 12], [12, 14]]]))
         return Observations(acquisition, torch.arange(24, dtype=torch.float64).reshape(1, 3, 8)/24)
 
-    def test_historical_point_and_finite_bundle_hashes_are_preserved(self):
-        # Digests captured using the independent, archived pre-fix bundle hasher.
+    def test_historical_bundle_hash_is_preserved(self):
+        # Digest captured using the independent, archived pre-fix bundle hasher.
         data = self.fixture()
         self.assertEqual(data.content_identity(), {"format": "gaussian-fwi-observation-content-v1",
                                                   "sha256": "01808a69322af7a6fee3b987df7e9d73375e05826733f9bcfec7f1edaa939507"})
-        data.acquisition = FootprintAcquisition(data.acquisition, GaussianFootprint(5., 0.))
-        self.assertEqual(data.content_identity()["sha256"], "73941de8296e86bdab18c7066834d228b5a3049eef690f03c8aedfbe03cc3380")
 
     def test_identity_is_recomputed_and_excludes_provenance_counters_and_layout(self):
         data = self.fixture()

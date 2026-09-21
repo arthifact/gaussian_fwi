@@ -1,12 +1,11 @@
 """Differentiable acoustic propagation and observation-only waveform objectives.
 
 This module contains no dataset loaders, acquisition presets, or target models.
-Coordinates and physical units are defined by :class:`fwi_core.GridSpec`.
+Coordinates and physical units are defined by :class:`~gaussian_fwi.core.geometry.GridSpec`.
 """
 
 import math
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Mapping, Sequence
 
 import deepwave
@@ -71,18 +70,8 @@ class Acquisition:
         """Batched solver calls, including line searches and validation evaluations."""
         return {"forward": self.forward_calls, "adjoint": self.adjoint_calls}
 
-    def simulate(self, velocity: Tensor, *, wavefield_storage: str = "device",
-                 storage_path: str | Path | None = None) -> Tensor:
+    def simulate(self, velocity: Tensor) -> Tensor:
         """Return receiver traces, retaining the gradient connection to velocity."""
-        if wavefield_storage not in ("device", "cpu", "disk"):
-            raise ValueError("wavefield_storage must be device, cpu or disk (uncompressed)")
-        storage = {"storage_mode": wavefield_storage, "storage_compression": False}
-        if wavefield_storage == "disk":
-            if storage_path is None or not Path(storage_path).is_dir():
-                raise ValueError("Disk wavefield storage requires an existing explicit directory")
-            storage["storage_path"] = str(storage_path)
-        elif storage_path is not None:
-            raise ValueError("storage_path is only valid for disk wavefields")
         if tuple(velocity.shape) != self.grid.shape:
             raise ValueError("Velocity shape does not match acquisition grid")
         if (
@@ -106,7 +95,10 @@ class Acquisition:
             pml_width=self.pml_width,
             pml_freq=self.pml_frequency,
             max_vel=self.max_velocity,
-            **storage,
+            # Explicit, uncompressed on-device wavefields: the storage the
+            # accepted results were produced with, stated rather than inherited.
+            storage_mode="device",
+            storage_compression=False,
         )[-1]
         if traces.requires_grad:
             traces.register_hook(self._record_adjoint)
@@ -266,29 +258,6 @@ class WaveformObjective:
                 value = value * (prediction.shape[0] / total_shots)
             values.append(value)
         return torch.stack(values)
-
-    def accumulate_shot_gradients(self, acquisition, velocity, active, *, wavefield_storage="device",
-                                  storage_path=None):
-        """Free each batch's wavefields after accumulating into a velocity leaf.
-
-        Returns detached predictions, complete band losses and dL_train/dv.
-        The caller backpropagates that complete gradient through its field once,
-        adds regularization once, then takes one full-survey optimizer update.
-        """
-        leaf = velocity.detach().requires_grad_()
-        prediction_buffer = velocity.new_empty(next(iter(self.targets.values())).shape)
-        contributions = []
-        for shots, prediction in acquisition.simulate_batches(leaf, wavefield_storage=wavefield_storage,
-                                                              storage_path=storage_path):
-            bands = self.losses(prediction, active, shot_slice=shots)
-            if not torch.isfinite(bands).all():
-                raise FloatingPointError("Non-finite training batch objective")
-            bands.mean().backward()
-            prediction_buffer[shots].copy_(prediction.detach())
-            contributions.append(bands.detach())
-        if leaf.grad is None or not torch.isfinite(leaf.grad).all():
-            raise FloatingPointError("Non-finite accumulated velocity gradient")
-        return prediction_buffer, torch.stack(contributions).sum(0), leaf.grad.detach()
 
     def losses_by_shot(
         self, prediction: Tensor, active: Sequence[float], split: str = "train"

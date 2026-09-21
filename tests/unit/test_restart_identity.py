@@ -11,7 +11,6 @@ from _problems import assert_exact, configuration, problem
 
 import gaussian_fwi
 from gaussian_fwi.core import GridSpec, Observations
-from gaussian_fwi.core.footprints import FootprintAcquisition, GaussianFootprint
 from gaussian_fwi.core.identity import observation_sha256
 
 
@@ -20,13 +19,9 @@ class RestartIdentityTests(unittest.TestCase):
     def setUpClass(cls):
         torch.set_num_threads(2)
 
-    def fixture(self, module, *, footprint=False, label=""):
+    def fixture(self, module, *, label=""):
         field, data, partitions = problem()
         field.add_grid_level((2, 2))
-        if footprint:
-            acquisition = FootprintAcquisition(data.acquisition, GaussianFootprint(5., 0.))
-            with torch.no_grad():
-                data = Observations(acquisition, acquisition.simulate(field()+45))
         data.sha256 = label
         config = replace(configuration(), seed_shape=None, steps_per_stage=2, validation_interval=1)
         return field, data, partitions, config
@@ -65,36 +60,32 @@ class RestartIdentityTests(unittest.TestCase):
                             self.assertEqual(changed.sha256, data.sha256)
                             self.reject(module, root / "fit/stage_00.pt", changed, root / name)
 
-    def test_matching_clones_resume_exactly_for_point_and_finite_measurements(self):
+    def test_matching_clones_resume_exactly_for_point_measurements(self):
         for module in (gaussian_fwi,):
-            for finite in (False, True):
-                with self.subTest(api=module.__name__, finite=finite), tempfile.TemporaryDirectory() as tmp:
-                    field, data, split, config = self.fixture(module, footprint=finite)
-                    root = Path(tmp)
-                    original = module.invert(field, data, config, root / "fit", partitions=split)
-                    acquisition = (FootprintAcquisition.from_checkpoint(data.acquisition.checkpoint()) if finite
-                                   else replace(data.acquisition, source_amplitudes=data.acquisition.source_amplitudes.clone()))
-                    # Different layout, object identity, counters and descriptive metadata.
-                    traces = data.traces.transpose(1, 2).contiguous().transpose(1, 2)
-                    clone = Observations(acquisition, traces, metadata={"description": "clone"})
-                    restored, report = module.resume(root / "fit/stage_00.pt", clone, root / "resume")
-                    assert_exact(restored.checkpoint(), field.checkpoint())
-                    for key in ("solver_calls", "waveforms", "stages", "observation_identity"):
-                        assert_exact(report[key], original[key])
-                    a = torch.load(root / "fit/stage_01.pt", weights_only=True)
-                    b = torch.load(root / "resume/stage_01.pt", weights_only=True)
-                    for key in ("field", "optimizer", "stages", "solver_calls", "observation_identity",
-                                "topology_state", "topology_history"):
-                        assert_exact(a.get(key), b.get(key))
-                    # Wall time is deliberately different; numerical history is exact.
-                    def history(payload):
-                        return [{k: v for k, v in row.items() if k != "elapsed_s"} for row in payload["history"]]
-                    assert_exact(history(a), history(b))
-                    prior = torch.load(root / "fit/stage_00.pt", weights_only=True)["history"]
-                    assert_exact(b["history"][:len(prior)], prior)
-                    if finite:
-                        changed = Observations(FootprintAcquisition(data.acquisition.base, GaussianFootprint(4., 0.)), traces)
-                        self.reject(module, root / "fit/stage_00.pt", changed, root / "changed_footprint")
+            with self.subTest(api=module.__name__), tempfile.TemporaryDirectory() as tmp:
+                field, data, split, config = self.fixture(module)
+                root = Path(tmp)
+                original = module.invert(field, data, config, root / "fit", partitions=split)
+                acquisition = replace(data.acquisition,
+                                      source_amplitudes=data.acquisition.source_amplitudes.clone())
+                # Different layout, object identity, counters and descriptive metadata.
+                traces = data.traces.transpose(1, 2).contiguous().transpose(1, 2)
+                clone = Observations(acquisition, traces, metadata={"description": "clone"})
+                restored, report = module.resume(root / "fit/stage_00.pt", clone, root / "resume")
+                assert_exact(restored.checkpoint(), field.checkpoint())
+                for key in ("solver_calls", "waveforms", "stages", "observation_identity"):
+                    assert_exact(report[key], original[key])
+                a = torch.load(root / "fit/stage_01.pt", weights_only=True)
+                b = torch.load(root / "resume/stage_01.pt", weights_only=True)
+                for key in ("field", "optimizer", "stages", "solver_calls", "observation_identity",
+                            "topology_state", "topology_history"):
+                    assert_exact(a.get(key), b.get(key))
+                # Wall time is deliberately different; numerical history is exact.
+                def history(payload):
+                    return [{k: v for k, v in row.items() if k != "elapsed_s"} for row in payload["history"]]
+                assert_exact(history(a), history(b))
+                prior = torch.load(root / "fit/stage_00.pt", weights_only=True)["history"]
+                assert_exact(b["history"][:len(prior)], prior)
 
     def test_legacy_and_unknown_identities_are_rejected_even_with_matching_labels(self):
         for module in (gaussian_fwi,):

@@ -7,7 +7,6 @@ from typing import BinaryIO
 import torch
 
 from .checkpoint import save_torch
-from .footprints import FootprintAcquisition
 from .geometry import GridSpec
 from .physics import Acquisition, Observations
 
@@ -32,7 +31,6 @@ def _partitions(partitions, receivers):
 def load_observations(
     source: str | Path | BinaryIO, *, expected_content_sha256: str | None = None,
     device: str | torch.device = "cpu", dtype: torch.dtype | None = None,
-    shot_batch_size: int | None = None,
 ) -> tuple[Observations, dict[str, torch.Tensor]]:
     """Validate a portable bundle, then explicitly move/cast its runtime tensors.
 
@@ -45,17 +43,14 @@ def load_observations(
         raise ValueError("Observation device must be CPU or CUDA")
     if dtype not in (None, torch.float32, torch.float64):
         raise ValueError("Observation precision must be float32 or float64")
-    if shot_batch_size is not None and (type(shot_batch_size) is not int or shot_batch_size < 1):
-        raise ValueError("shot_batch_size must be a positive integer or None")
     bundle = torch.load(source, map_location="cpu", weights_only=True)
     if not isinstance(bundle, dict) or set(bundle) != {"acquisition", "traces", "partitions"}:
         raise ValueError("Observation bundle keys must be acquisition, traces and partitions")
     values = dict(bundle["acquisition"])
     if "format" in values:
-        acquisition = FootprintAcquisition.from_checkpoint(values)
-    else:
-        values["grid"] = GridSpec(**values["grid"])
-        acquisition = Acquisition(**values)
+        raise ValueError("This release inverts point sources and receivers, not finite footprints")
+    values["grid"] = GridSpec(**values["grid"])
+    acquisition = Acquisition(**values)
     observations = Observations(acquisition, bundle["traces"])
     _partitions(bundle["partitions"], observations.traces.shape[1])
     identity = observations.content_identity()["sha256"]
@@ -71,21 +66,10 @@ def load_observations(
             return value
 
         values = convert(dict(bundle["acquisition"]))
-        if "format" in values:
-            acquisition = FootprintAcquisition.from_checkpoint(values)
-        else:
-            values["grid"] = GridSpec(**values["grid"])
-            acquisition = Acquisition(**values)
+        values["grid"] = GridSpec(**values["grid"])
+        acquisition = Acquisition(**values)
         observations = Observations(acquisition, convert(bundle["traces"]))
         bundle["partitions"] = convert(bundle["partitions"])
-    if shot_batch_size is not None:
-        if isinstance(observations.acquisition, FootprintAcquisition):
-            acquisition = FootprintAcquisition(observations.acquisition.base,
-                                               observations.acquisition.footprint,
-                                               shot_batch_size=shot_batch_size)
-            observations = Observations(acquisition, observations.traces)
-        elif shot_batch_size != 1:
-            raise ValueError("Explicit shot grouping requires a finite-footprint acquisition")
     observations.sha256 = identity
     return observations, bundle["partitions"]
 
@@ -93,13 +77,9 @@ def load_observations(
 def save_observations(observations, partitions, destination: str | Path) -> None:
     """Save detached CPU tensors atomically without replacing an existing file."""
     _partitions(partitions, observations.traces.shape[1])
-    acquisition = observations.acquisition
-    if isinstance(acquisition, FootprintAcquisition):
-        values = acquisition.checkpoint()
-    else:
-        values = asdict(acquisition)
-        values.pop("forward_calls")
-        values.pop("adjoint_calls")
+    values = asdict(observations.acquisition)
+    values.pop("forward_calls")
+    values.pop("adjoint_calls")
 
     def cpu(value):
         if isinstance(value, torch.Tensor):

@@ -16,9 +16,7 @@ from ._structure import GaussianCheckpoint
 from ._topology import GaussianTopology
 from .core import Observations, Preprocessing, Regularization
 from .core.checkpoint import prepare_output, save_json, save_torch
-from .core.footprints import FootprintAcquisition
 from .core.physics import WaveformObjective
-from .core.wavefields import wavefield_directory
 from .field import GaussianField
 from .refinement import RefinementConfig, RefinementController
 from .sampling import sampling_diagnostics
@@ -96,8 +94,6 @@ def invert(
     max_updates: int | None = None,
     max_seconds: float | None = None,
     diagnostics: bool = False,
-    accumulate_shots: bool = False,
-    wavefield_storage: str = "device",
     _resume: dict | None = None,
 ) -> dict:
     """Optimize training waveforms and select a settling-phase validation checkpoint.
@@ -116,12 +112,6 @@ def invert(
         raise ValueError("max_seconds must be finite and positive")
     if type(diagnostics) is not bool:
         raise ValueError("diagnostics must be boolean")
-    if type(accumulate_shots) is not bool:
-        raise ValueError("accumulate_shots must be boolean")
-    if wavefield_storage not in ("device", "cpu", "disk"):
-        raise ValueError("wavefield_storage must be device, cpu or disk (uncompressed)")
-    if accumulate_shots and not isinstance(observations.acquisition, FootprintAcquisition):
-        raise ValueError("Shot accumulation requires a finite-footprint acquisition")
     if model.grid != observations.acquisition.grid:
         raise ValueError("Field and acquisition must use the same physical grid")
     if (model.background.dtype != observations.traces.dtype
@@ -139,13 +129,6 @@ def invert(
         "partitions": {name: ids.tolist() for name, ids in objective.split.items()},
         "observation_sha256": observations.sha256,
     }
-    shot_batch_size = getattr(observations.acquisition, "shot_batch_size", 1)
-    if shot_batch_size != 1:
-        specification["shot_batch_size"] = shot_batch_size
-    if accumulate_shots:
-        specification["accumulate_shots"] = True
-    if wavefield_storage != "device":
-        specification["wavefield_storage"] = wavefield_storage
     seed = None
     if _resume is None:
         if config.seed_shape is None:
@@ -256,246 +239,230 @@ def invert(
                     or rng["cuda"].shape != torch.cuda.get_rng_state(model.background.device).shape):
                 raise ValueError("Invalid saved CUDA random state")
     output = prepare_output(output)
-    with wavefield_directory(output, wavefield_storage) as storage_path:
-        if seed is not None:
-            model.blocks = seed.blocks
-        if optimizer is None:
-            optimizer = torch.optim.Adam(model.parameter_groups(**config.learning_rates()))
-        validate_adam(model, optimizer)
-        starting_counts = observations.acquisition.counts
-        start = time.perf_counter()
-        segment_updates = 0
-        if _resume is not None and _resume["format"] == UPDATE_FORMAT:
-            torch.random.set_rng_state(_resume["rng"]["cpu"])
-            if model.background.is_cuda:
-                torch.cuda.set_rng_state(_resume["rng"]["cuda"], model.background.device)
+    if seed is not None:
+        model.blocks = seed.blocks
+    if optimizer is None:
+        optimizer = torch.optim.Adam(model.parameter_groups(**config.learning_rates()))
+    validate_adam(model, optimizer)
+    starting_counts = observations.acquisition.counts
+    start = time.perf_counter()
+    segment_updates = 0
+    if _resume is not None and _resume["format"] == UPDATE_FORMAT:
+        torch.random.set_rng_state(_resume["rng"]["cpu"])
+        if model.background.is_cuda:
+            torch.cuda.set_rng_state(_resume["rng"]["cuda"], model.background.device)
 
-        def elapsed():
-            return prior_elapsed + time.perf_counter() - start
+    def elapsed():
+        return prior_elapsed + time.perf_counter() - start
 
-        def counts():
-            current = observations.acquisition.counts
-            return {name: prior_counts[name] + current[name] - starting_counts[name] for name in current}
+    def counts():
+        current = observations.acquisition.counts
+        return {name: prior_counts[name] + current[name] - starting_counts[name] for name in current}
 
-        def save_update(stage, completed_step, controller, best, best_topology):
-            selected = None
-            if best.model_state is not None:
-                selected_field = GaussianField.from_checkpoint(model.checkpoint())
-                selected_field.load_state_dict(best.model_state)
-                selected = {"field": selected_field.checkpoint(), "optimizer": best.optimizer_state,
-                            "score": best.score, "step": best.step, "topology": best_topology}
-            path = output / f"update_{stage * config.steps_per_stage + completed_step:08d}.pt"
-            save_torch({"format": UPDATE_FORMAT, "specification": specification,
-                        "observation_identity": identity, "active_stage": stage,
-                        "completed_step": completed_step, "device_type": model.background.device.type,
-                        "optimizer": optimizer.state_dict(), "field": model.checkpoint(),
-                        "stages": stages, "history": history, "topology_history": events,
-                        "topology_state": controller.topology.state_dict(),
-                        "controller_state": controller.state_dict(), "best": selected,
-                        "initial_velocity": initial_velocity.detach().cpu(),
-                        "initial_prediction": initial_prediction.detach().cpu(),
-                        "solver_calls": counts(), "elapsed_s": elapsed(),
-                        "rng": {"cpu": torch.random.get_rng_state(),
-                                "cuda": torch.cuda.get_rng_state(model.background.device)
-                                if model.background.is_cuda else None}}, path)
-            return path
+    def save_update(stage, completed_step, controller, best, best_topology):
+        selected = None
+        if best.model_state is not None:
+            selected_field = GaussianField.from_checkpoint(model.checkpoint())
+            selected_field.load_state_dict(best.model_state)
+            selected = {"field": selected_field.checkpoint(), "optimizer": best.optimizer_state,
+                        "score": best.score, "step": best.step, "topology": best_topology}
+        path = output / f"update_{stage * config.steps_per_stage + completed_step:08d}.pt"
+        save_torch({"format": UPDATE_FORMAT, "specification": specification,
+                    "observation_identity": identity, "active_stage": stage,
+                    "completed_step": completed_step, "device_type": model.background.device.type,
+                    "optimizer": optimizer.state_dict(), "field": model.checkpoint(),
+                    "stages": stages, "history": history, "topology_history": events,
+                    "topology_state": controller.topology.state_dict(),
+                    "controller_state": controller.state_dict(), "best": selected,
+                    "initial_velocity": initial_velocity.detach().cpu(),
+                    "initial_prediction": initial_prediction.detach().cpu(),
+                    "solver_calls": counts(), "elapsed_s": elapsed(),
+                    "rng": {"cpu": torch.random.get_rng_state(),
+                            "cuda": torch.cuda.get_rng_state(model.background.device)
+                            if model.background.is_cuda else None}}, path)
+        return path
 
-        with torch.no_grad():
-            if _resume is None:
-                initial_velocity = model().clone()
-                initial_prediction = observations.acquisition.simulate(initial_velocity)
-            else:
-                initial_velocity = _resume["initial_velocity"].to(model.background)
-                initial_prediction = _resume["initial_prediction"].to(model.background)
-        if accumulate_shots and model.background.is_cuda:
-            # Initialization uses large temporary FFT buffers. Release unused blocks
-            # once before the first acoustic workspace, including on resumed runs.
-            torch.cuda.empty_cache()
-        for stage_index in range(first_stage, len(config.cutoffs)):
-            active = config.cutoffs[:stage_index + 1]
-            controller = (saved_controller if stage_index == first_stage and saved_controller is not None
-                          else RefinementController(model, config.refinement,
-                                                    steps_per_stage=config.steps_per_stage,
-                                                    stage=stage_index, topology_state=topology_state))
-            best, best_topology = GaussianCheckpoint(), None
-            if stage_index == first_stage and saved_best is not None:
-                best, best_topology = restored_best, saved_best["topology"]
-            stop = config.refinement.stop_step(config.steps_per_stage)
-            stage_first_step = first_step if stage_index == first_stage else 0
-            for step in range(stage_first_step, config.steps_per_stage + 1):
-                terminal = step == config.steps_per_stage
-                optimizer.zero_grad(set_to_none=True)
-                try:
-                    with torch.set_grad_enabled(not terminal):
-                        raw = model.raw()
-                        velocity = model.bound_velocity(raw).reshape(model.grid.shape)
-                        if accumulate_shots and not terminal:
-                            prediction, train_bands, waveform_gradient = objective.accumulate_shot_gradients(
-                                observations.acquisition, velocity, active, wavefield_storage=wavefield_storage,
-                                storage_path=storage_path)
-                        else:
-                            prediction = observations.acquisition.simulate(velocity, wavefield_storage=wavefield_storage,
-                                                                          storage_path=storage_path)
-                            train_bands = objective.losses(prediction, active, "train")
-                        train = train_bands.mean()
-                        # Preserve the established two-decoder accumulation order.
-                        bounds_raw = model.raw()
-                        bounds_loss = ((bounds_raw - bounds_raw.clamp(*model.bounds)) / 1000).square().mean()
-                        penalty = regularization(velocity, model.grid.spacing)
-                        penalty = penalty + config.raw_bounds_weight * bounds_loss
-                        loss = train + penalty
-                    if not torch.isfinite(loss):
-                        raise FloatingPointError("Non-finite training objective")
-                    inspect = step % config.validation_interval == 0 or terminal
-                    validation = None
-                    eligible = inspect and step >= stop
-                    if inspect:
-                        with torch.no_grad():
-                            validation = float(objective.losses(prediction.detach(), active,
-                                                                "validation").mean())
-                        if not math.isfinite(validation):
-                            raise FloatingPointError("Non-finite validation objective")
-                        if eligible and best.consider(validation, step, model, optimizer):
-                            best_topology = controller.topology.state_dict()
-                        _LOG.info("Gaussian FWI stage=%d step=%d kernels=%d train=%.6g validation=%.6g",
-                                  stage_index, step, model.count, float(train.detach()), validation)
-                    history.append({"stage": stage_index, "step": step,
-                                    "cutoff_hz": config.cutoffs[stage_index],
-                                    "phase": "settling" if step >= stop else "refining",
-                                    "selection_eligible": eligible, "gaussians": model.count,
-                                    "train": float(train.detach()), "objective": float(loss.detach()),
-                                    "regularizer": float(penalty.detach()), "validation": validation,
-                                    "train_bands": train_bands.detach().tolist(),
-                                    "solver_calls": counts(), "elapsed_s": elapsed()})
-                    if terminal:
-                        break
-                    if accumulate_shots:
-                        torch.autograd.backward((velocity, penalty),
-                                                (waveform_gradient, torch.ones_like(penalty)))
-                    else:
-                        loss.backward()
-                    if any(p.grad is not None and not torch.isfinite(p.grad).all()
-                           for p in model.parameters()):
-                        raise FloatingPointError("Non-finite parameter gradient")
-                    controller.observe(model)
-                    measured = diagnostics and (inspect or (checkpoint_interval is not None
-                                                             and (step + 1) % checkpoint_interval == 0))
-                    if measured:
-                        before = {id(p): p.detach().clone() for p in model.parameters()}
-                        gradient_squares = {}
-                        for group in optimizer.param_groups:
-                            role = group["role"]
-                            gradient_squares[role] = gradient_squares.get(role, 0.) + sum(
-                                float(p.grad.detach().double().square().sum())
-                                for p in group["params"] if p.grad is not None)
-                        history[-1]["gradient_l2_by_role"] = {
-                            role: math.sqrt(value) for role, value in gradient_squares.items()}
-                    optimizer.step()
-                    model.project_()
-                    if measured:
-                        update_squares = {}
-                        for group in optimizer.param_groups:
-                            role = group["role"]
-                            update_squares[role] = update_squares.get(role, 0.) + sum(
-                                float((p.detach().double() - before[id(p)].double()).square().sum())
-                                for p in group["params"])
-                        history[-1]["parameter_update_l2_by_role"] = {
-                            role: math.sqrt(value) for role, value in update_squares.items()}
-                    event = controller.after_update(model, optimizer, step + 1)
-                    if event is not None:
-                        event["cutoff_hz"] = config.cutoffs[stage_index]
-                        event["solver_calls"] = counts()
-                        events.append(event)
-                    if measured:
-                        with torch.no_grad():
-                            change = model().double() - velocity.detach().double()
-                        history[-1]["completed_update_field_change"] = {
-                            "rmse_m_s": float(change.square().mean().sqrt()),
-                            "maximum_m_s": float(change.abs().max()),
-                            "includes_density_event": event is not None}
-                    segment_updates += 1
-                    pause = ((max_updates is not None and segment_updates >= max_updates)
-                             or (max_seconds is not None and time.perf_counter() - start >= max_seconds))
-                    if pause or (checkpoint_interval is not None and (step + 1) % checkpoint_interval == 0):
-                        checkpoint = save_update(stage_index, step + 1, controller, best, best_topology)
-                    if pause:
-                        save_json(history, output / "history.json", overwrite=True)
-                        save_json(events, output / "refinement.json", overwrite=True)
-                        report = {**specification, "status": "paused", "checkpoint": checkpoint.name,
-                                  "observation_identity": identity, "active_stage": stage_index,
-                                  "completed_step": step + 1, "stages": stages,
-                                  "gaussians": model.count, "parameters": sum(p.numel() for p in model.parameters()),
-                                  "solver_calls": counts(), "elapsed_s": elapsed(),
-                                  "optimizer_updates": {"trajectory": stage_index * config.steps_per_stage + step + 1,
-                                                        "refinement_trials": 0},
-                                  "truth_used_for_training_or_selection": False,
-                                  "topology_history": events, "selection_window": "settling"}
-                        save_json(report, output / "report.json")
-                        return report
-                except (FloatingPointError, RuntimeError):
-                    if best.model_state is not None:
-                        best.restore(model, optimizer)
-                    raise
-            best.restore(model, optimizer)
-            if best_topology is None:
-                raise RuntimeError("No finite settling-phase checkpoint was selected")
-            controller.topology.load_state_dict(best_topology)
-            topology_state = controller.topology.state_dict()
-            stages.append({"cutoff_hz": config.cutoffs[stage_index], "selected_step": best.step,
-                           "validation": best.score, "gaussians": model.count,
-                           "refinement_stop_step": stop})
-            payload = {
-                "format": TRAINING_FORMAT, "specification": specification,
-                "observation_identity": identity, "completed_stage": stage_index,
-                "optimizer": optimizer.state_dict(), "field": model.checkpoint(),
-                "stages": stages, "history": history, "topology_history": events,
-                "topology_state": topology_state, "initial_velocity": initial_velocity.detach().cpu(),
-                "initial_prediction": initial_prediction.detach().cpu(),
-                "solver_calls": counts(), "elapsed_s": elapsed(),
-            }
-            save_torch(payload, output / f"stage_{stage_index:02d}.pt")
-            save_json(history, output / "history.json", overwrite=True)
-            save_json(events, output / "refinement.json", overwrite=True)
-        with torch.no_grad():
-            final_velocity = model().clone()
-            final_prediction = observations.acquisition.simulate(final_velocity)
-            waveform_scores = {
-                name: {"initial": objective.losses(initial_prediction, config.cutoffs, name).tolist(),
-                       "final": objective.losses(final_prediction, config.cutoffs, name).tolist(),
-                       "receiver_indices": ids.tolist()} for name, ids in objective.split.items()
-            }
-        model.save(output / "field.pt")
-        save_torch({"initial_velocity": initial_velocity.cpu(), "final_velocity": final_velocity.cpu(),
-                    "initial_prediction": initial_prediction.cpu(),
-                    "final_prediction": final_prediction.cpu()}, output / "predictions.pt")
-        report = {
-            **specification, "observation_identity": identity, "stages": stages,
-            "waveforms": waveform_scores, "parameters": sum(p.numel() for p in model.parameters()),
-            "gaussians": model.count, "elapsed_s": elapsed(), "solver_calls": counts(),
-            "optimizer_updates": {"trajectory": len(config.cutoffs) * config.steps_per_stage,
-                                  "refinement_trials": 0},
-            "truth_used_for_training_or_selection": False, "topology_history": events,
-            "selection_window": "settling",
+    with torch.no_grad():
+        if _resume is None:
+            initial_velocity = model().clone()
+            initial_prediction = observations.acquisition.simulate(initial_velocity)
+        else:
+            initial_velocity = _resume["initial_velocity"].to(model.background)
+            initial_prediction = _resume["initial_prediction"].to(model.background)
+    for stage_index in range(first_stage, len(config.cutoffs)):
+        active = config.cutoffs[:stage_index + 1]
+        controller = (saved_controller if stage_index == first_stage and saved_controller is not None
+                      else RefinementController(model, config.refinement,
+                                                steps_per_stage=config.steps_per_stage,
+                                                stage=stage_index, topology_state=topology_state))
+        best, best_topology = GaussianCheckpoint(), None
+        if stage_index == first_stage and saved_best is not None:
+            best, best_topology = restored_best, saved_best["topology"]
+        stop = config.refinement.stop_step(config.steps_per_stage)
+        stage_first_step = first_step if stage_index == first_stage else 0
+        for step in range(stage_first_step, config.steps_per_stage + 1):
+            terminal = step == config.steps_per_stage
+            optimizer.zero_grad(set_to_none=True)
+            try:
+                with torch.set_grad_enabled(not terminal):
+                    raw = model.raw()
+                    velocity = model.bound_velocity(raw).reshape(model.grid.shape)
+                    prediction = observations.acquisition.simulate(velocity)
+                    train_bands = objective.losses(prediction, active, "train")
+                    train = train_bands.mean()
+                    # Preserve the established two-decoder accumulation order.
+                    bounds_raw = model.raw()
+                    bounds_loss = ((bounds_raw - bounds_raw.clamp(*model.bounds)) / 1000).square().mean()
+                    penalty = regularization(velocity, model.grid.spacing)
+                    penalty = penalty + config.raw_bounds_weight * bounds_loss
+                    loss = train + penalty
+                if not torch.isfinite(loss):
+                    raise FloatingPointError("Non-finite training objective")
+                inspect = step % config.validation_interval == 0 or terminal
+                validation = None
+                eligible = inspect and step >= stop
+                if inspect:
+                    with torch.no_grad():
+                        validation = float(objective.losses(prediction.detach(), active,
+                                                            "validation").mean())
+                    if not math.isfinite(validation):
+                        raise FloatingPointError("Non-finite validation objective")
+                    if eligible and best.consider(validation, step, model, optimizer):
+                        best_topology = controller.topology.state_dict()
+                    _LOG.info("Gaussian FWI stage=%d step=%d kernels=%d train=%.6g validation=%.6g",
+                              stage_index, step, model.count, float(train.detach()), validation)
+                history.append({"stage": stage_index, "step": step,
+                                "cutoff_hz": config.cutoffs[stage_index],
+                                "phase": "settling" if step >= stop else "refining",
+                                "selection_eligible": eligible, "gaussians": model.count,
+                                "train": float(train.detach()), "objective": float(loss.detach()),
+                                "regularizer": float(penalty.detach()), "validation": validation,
+                                "train_bands": train_bands.detach().tolist(),
+                                "solver_calls": counts(), "elapsed_s": elapsed()})
+                if terminal:
+                    break
+                loss.backward()
+                if any(p.grad is not None and not torch.isfinite(p.grad).all()
+                       for p in model.parameters()):
+                    raise FloatingPointError("Non-finite parameter gradient")
+                controller.observe(model)
+                measured = diagnostics and (inspect or (checkpoint_interval is not None
+                                                         and (step + 1) % checkpoint_interval == 0))
+                if measured:
+                    before = {id(p): p.detach().clone() for p in model.parameters()}
+                    gradient_squares = {}
+                    for group in optimizer.param_groups:
+                        role = group["role"]
+                        gradient_squares[role] = gradient_squares.get(role, 0.) + sum(
+                            float(p.grad.detach().double().square().sum())
+                            for p in group["params"] if p.grad is not None)
+                    history[-1]["gradient_l2_by_role"] = {
+                        role: math.sqrt(value) for role, value in gradient_squares.items()}
+                optimizer.step()
+                model.project_()
+                if measured:
+                    update_squares = {}
+                    for group in optimizer.param_groups:
+                        role = group["role"]
+                        update_squares[role] = update_squares.get(role, 0.) + sum(
+                            float((p.detach().double() - before[id(p)].double()).square().sum())
+                            for p in group["params"])
+                    history[-1]["parameter_update_l2_by_role"] = {
+                        role: math.sqrt(value) for role, value in update_squares.items()}
+                event = controller.after_update(model, optimizer, step + 1)
+                if event is not None:
+                    event["cutoff_hz"] = config.cutoffs[stage_index]
+                    event["solver_calls"] = counts()
+                    events.append(event)
+                if measured:
+                    with torch.no_grad():
+                        change = model().double() - velocity.detach().double()
+                    history[-1]["completed_update_field_change"] = {
+                        "rmse_m_s": float(change.square().mean().sqrt()),
+                        "maximum_m_s": float(change.abs().max()),
+                        "includes_density_event": event is not None}
+                segment_updates += 1
+                pause = ((max_updates is not None and segment_updates >= max_updates)
+                         or (max_seconds is not None and time.perf_counter() - start >= max_seconds))
+                if pause or (checkpoint_interval is not None and (step + 1) % checkpoint_interval == 0):
+                    checkpoint = save_update(stage_index, step + 1, controller, best, best_topology)
+                if pause:
+                    save_json(history, output / "history.json", overwrite=True)
+                    save_json(events, output / "refinement.json", overwrite=True)
+                    report = {**specification, "status": "paused", "checkpoint": checkpoint.name,
+                              "observation_identity": identity, "active_stage": stage_index,
+                              "completed_step": step + 1, "stages": stages,
+                              "gaussians": model.count, "parameters": sum(p.numel() for p in model.parameters()),
+                              "solver_calls": counts(), "elapsed_s": elapsed(),
+                              "optimizer_updates": {"trajectory": stage_index * config.steps_per_stage + step + 1,
+                                                    "refinement_trials": 0},
+                              "truth_used_for_training_or_selection": False,
+                              "topology_history": events, "selection_window": "settling"}
+                    save_json(report, output / "report.json")
+                    return report
+            except (FloatingPointError, RuntimeError):
+                if best.model_state is not None:
+                    best.restore(model, optimizer)
+                raise
+        best.restore(model, optimizer)
+        if best_topology is None:
+            raise RuntimeError("No finite settling-phase checkpoint was selected")
+        controller.topology.load_state_dict(best_topology)
+        topology_state = controller.topology.state_dict()
+        stages.append({"cutoff_hz": config.cutoffs[stage_index], "selected_step": best.step,
+                       "validation": best.score, "gaussians": model.count,
+                       "refinement_stop_step": stop})
+        payload = {
+            "format": TRAINING_FORMAT, "specification": specification,
+            "observation_identity": identity, "completed_stage": stage_index,
+            "optimizer": optimizer.state_dict(), "field": model.checkpoint(),
+            "stages": stages, "history": history, "topology_history": events,
+            "topology_state": topology_state, "initial_velocity": initial_velocity.detach().cpu(),
+            "initial_prediction": initial_prediction.detach().cpu(),
+            "solver_calls": counts(), "elapsed_s": elapsed(),
         }
+        save_torch(payload, output / f"stage_{stage_index:02d}.pt")
         save_json(history, output / "history.json", overwrite=True)
         save_json(events, output / "refinement.json", overwrite=True)
-        save_json({"state": topology_state, "history": events}, output / "topology.json")
-        if model.sampling is not None:
-            report["sampling_policy"] = asdict(model.sampling)
-        factors = config.sampling_refinement_factors or ((2, 4) if model.sampling else ())
-        if factors:
-            saved = GaussianField.load(output / "field.pt", device=model.background.device)
-            report["sampling_diagnostics"] = [sampling_diagnostics(saved, refinement_factor=f)
-                                               for f in factors]
-            save_json({"field": "field.pt", "solver_calls": {"forward": 0, "adjoint": 0},
-                       "diagnostics": report["sampling_diagnostics"]}, output / "sampling.json")
-        save_json(report, output / "report.json")
-        return report
+    with torch.no_grad():
+        final_velocity = model().clone()
+        final_prediction = observations.acquisition.simulate(final_velocity)
+        waveform_scores = {
+            name: {"initial": objective.losses(initial_prediction, config.cutoffs, name).tolist(),
+                   "final": objective.losses(final_prediction, config.cutoffs, name).tolist(),
+                   "receiver_indices": ids.tolist()} for name, ids in objective.split.items()
+        }
+    model.save(output / "field.pt")
+    save_torch({"initial_velocity": initial_velocity.cpu(), "final_velocity": final_velocity.cpu(),
+                "initial_prediction": initial_prediction.cpu(),
+                "final_prediction": final_prediction.cpu()}, output / "predictions.pt")
+    report = {
+        **specification, "observation_identity": identity, "stages": stages,
+        "waveforms": waveform_scores, "parameters": sum(p.numel() for p in model.parameters()),
+        "gaussians": model.count, "elapsed_s": elapsed(), "solver_calls": counts(),
+        "optimizer_updates": {"trajectory": len(config.cutoffs) * config.steps_per_stage,
+                              "refinement_trials": 0},
+        "truth_used_for_training_or_selection": False, "topology_history": events,
+        "selection_window": "settling",
+    }
+    save_json(history, output / "history.json", overwrite=True)
+    save_json(events, output / "refinement.json", overwrite=True)
+    save_json({"state": topology_state, "history": events}, output / "topology.json")
+    if model.sampling is not None:
+        report["sampling_policy"] = asdict(model.sampling)
+    factors = config.sampling_refinement_factors or ((2, 4) if model.sampling else ())
+    if factors:
+        saved = GaussianField.load(output / "field.pt", device=model.background.device)
+        report["sampling_diagnostics"] = [sampling_diagnostics(saved, refinement_factor=f)
+                                           for f in factors]
+        save_json({"field": "field.pt", "solver_calls": {"forward": 0, "adjoint": 0},
+                   "diagnostics": report["sampling_diagnostics"]}, output / "sampling.json")
+    save_json(report, output / "report.json")
+    return report
 
 
 def resume(checkpoint, observations, output, *, device="cpu", checkpoint_interval=None,
-           max_updates=None, max_seconds=None, diagnostics=False, accumulate_shots=None,
-           wavefield_storage=None):
+           max_updates=None, max_seconds=None, diagnostics=False):
     """Resume the same algorithm after a completed stage or update into a fresh directory.
 
     Older algorithm checkpoints require their archived source. Their field
@@ -507,10 +474,6 @@ def resume(checkpoint, observations, output, *, device="cpu", checkpoint_interva
     if payload.get("observation_identity") != observations.content_identity():
         raise ValueError("Checkpoint observation content does not match")
     spec = payload["specification"]
-    if accumulate_shots is None:
-        accumulate_shots = spec.get("accumulate_shots", False)
-    if wavefield_storage is None:
-        wavefield_storage = spec.get("wavefield_storage", "device")
     config = InversionConfig(**spec["config"])
     model = GaussianField.from_checkpoint(payload["field"], device=device)
     partitions = {name: torch.tensor(ids, dtype=torch.int64, device=device)
@@ -520,5 +483,5 @@ def resume(checkpoint, observations, output, *, device="cpu", checkpoint_interva
                     preprocessing=Preprocessing(**spec["preprocessing"]),
                     checkpoint_interval=checkpoint_interval, max_updates=max_updates,
                     max_seconds=max_seconds, diagnostics=diagnostics,
-                    accumulate_shots=accumulate_shots, wavefield_storage=wavefield_storage, _resume=payload)
+                    _resume=payload)
     return model, report
