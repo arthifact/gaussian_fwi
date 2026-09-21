@@ -71,11 +71,29 @@ are spent on noise and on structure in the unilluminated zone, where the
 1.24 parameters per grid cell — more freedom than a grid of the same model — so
 at that capacity the representation supplies no dimensionality reduction at all.
 
-This is regularization by parameterization, and it is not by itself evidence
-that the Gaussian field beats a conventional smoothness prior. Establishing that
-needs a control at equal smoothness, and a claim about *adaptive* allocation
-needs the density controller to be doing the placing, which uniform seeding does
-not test.
+This is regularization by parameterization. A conventional smoothness prior
+does not substitute for it. Raising the TV weight on the 32x32 field, at the
+same horizon:
+
+| Setup | Params | RMSE all | RMSE <300 m | RMSE >300 m | Roughness |
+|---|---|---|---|---|---|
+| 8x8, tv=1e-4 | 380 | 500.2 | 158.8 | 647.2 | 37.8 |
+| 32x32, tv=1e-4 | 6068 | 512.2 | 184.8 | 658.4 | 92.5 |
+| 32x32, tv=1e-3 | 6044 | 511.8 | 182.5 | 658.3 | 83.2 |
+| 32x32, tv=1e-2 | 6038 | 538.2 | 168.6 | 696.9 | 48.2 |
+
+A hundredfold TV weight smooths the field and helps the illuminated zone, but
+degrades the unilluminated zone and the model as a whole, and still does not
+reach the low-capacity result. TV penalizes gradients uniformly, so it blurs
+real structure where the data constrain it while still permitting noise-driven
+structure where they do not. Lowering capacity removes the freedom instead.
+
+Two limits on that conclusion. This is not a grid-FWI baseline: the control is
+a 32x32 Gaussian field with a stronger penalty, not 4,900 free pixels, so it
+does not establish an advantage over grid inversion. And every run here learns
+geometry, so the study varies component count, not whether geometry is movable;
+the fixed-versus-learned comparison belongs to the manuscript's supervised
+study, and this release requires a fully trainable field.
 
 One subtlety worth knowing if you change the modelling grid: Deepwave injects a
 source as `amplitude * dt²`, so refining the time step alone scales recorded
