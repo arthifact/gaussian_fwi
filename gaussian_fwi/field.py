@@ -43,10 +43,10 @@ class GaussianBlock(nn.Module):
             raise ValueError(
                 "Centers and positive scales must be finite, matching float32/64 tensors"
             )
-        self.centers = nn.Parameter(centers.clone())
-        self.log_scales = nn.Parameter(scales.log().clone())
-        self.shears = nn.Parameter(centers.new_zeros((n, d * (d - 1) // 2)))
-        self.amplitudes = nn.Parameter(centers.new_zeros(n))
+        self.centers = nn.Parameter(centers.clone())  # (n, d) metres: (x, z) or (x, y, z)
+        self.log_scales = nn.Parameter(scales.log().clone())  # (n, d) log widths in metres
+        self.shears = nn.Parameter(centers.new_zeros((n, d * (d - 1) // 2)))  # tilt, 1 in 2D
+        self.amplitudes = nn.Parameter(centers.new_zeros(n))  # (n,) signed m/s contribution
         self.nominal_scale = float(scales.mean())
         self.amplitude_lr_scale = 1.0
 
