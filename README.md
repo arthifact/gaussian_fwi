@@ -91,6 +91,19 @@ Source amplitudes have shape `(shots, sources, time)` and traces
 and disjoint; a test partition is optional and is scored only after selection.
 Build one with `gaussian_fwi.save_observations`.
 
+## Document
+
+    pip install -e ".[docs]"
+    python docs/build_walkthrough.py --output "Gaussian FWI Walkthrough.docx"
+
+Rebuilds the illustrated walkthrough: the method, the code it is implemented
+in, and the Marmousi demonstration. Every code excerpt it shows is copied
+verbatim from this package and recorded with the file it came from, and the
+tests fail if the source changes without the document following. Figures 3, 5,
+6 and 7 come from the scripts in `models/` and need a finished run in
+`results/`; figures 1, 2, 4 and 8 are constructed illustrations in
+`docs/figures/`.
+
 ## Test
 
     python -m unittest discover -s tests/unit
