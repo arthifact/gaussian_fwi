@@ -38,7 +38,9 @@ def main():
     parser.add_argument("--large", type=int, default=32, help="Large seed lattice")
     parser.add_argument("--small", type=int, default=8, help="Reference small lattice")
     parser.add_argument("--tv", type=float, nargs="+", default=[1e-4, 1e-2])
-    parser.add_argument("--tgv", type=float, nargs="+", default=[1e-3, 1e-2, 1e-1])
+    parser.add_argument("--tgv", type=float, nargs="+", default=[1e-4, 1e-3, 1e-2])
+    parser.add_argument("--tgv-steps", type=int, default=2000,
+                        help="Inner iterations; too few make TGV inert")
     parser.add_argument("--steps-per-stage", type=int, default=60)
     parser.add_argument("--illuminated-m", type=float, default=300.0)
     parser.add_argument("--spacing", type=float, default=10.0)
@@ -58,7 +60,8 @@ def main():
     cases += [(f"{args.large}x{args.large}, tv={w:g}", args.large, {"tv_weight": w})
               for w in args.tv]
     cases += [(f"{args.large}x{args.large}, tgv={w:g}", args.large,
-               {"tv_weight": 0.0, "tgv_weight": w}) for w in args.tgv]
+               {"tv_weight": 0.0, "tgv_weight": w, "tgv_steps": args.tgv_steps})
+              for w in args.tgv]
 
     rows = []
     for index, (label, lattice, regularization) in enumerate(cases):

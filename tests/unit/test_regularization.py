@@ -50,11 +50,34 @@ class RegularizationTests(unittest.TestCase):
         tgv = float(Regularization(tgv_weight=1.0)(field, 10.0))
         tv = float(Regularization(tv_weight=1.0)(field, 10.0))
         self.assertLess(tgv, tv / 10, "TGV should barely notice a linear trend")
-        # The residual is the boundary convention, not an unconverged inner solve:
-        # the outward difference is zero at the far edge, so the gradient steps
-        # there and TGV correctly charges for it. More iterations do not remove it.
-        longer = float(Regularization(tgv_weight=1.0, tgv_steps=40)(field, 10.0))
-        self.assertAlmostEqual(tgv, longer, delta=0.2 * tgv)
+
+    def test_tgv_gradient_is_converged_on_a_rough_field(self):
+        """A smooth field cannot detect an unconverged inner solve.
+
+        TGV is warm-started at the velocity gradient, which is already optimal
+        for an affine field, so any number of steps looks converged there. On a
+        rough field too few steps leave the auxiliary field at that warm start,
+        the fidelity term stays near zero, and the penalty delivers almost no
+        gradient. This pins the shipped defaults against a longer solve.
+        """
+        torch.manual_seed(0)
+        rows = torch.arange(50, dtype=torch.float64)[:, None].expand(50, 50)
+        rough = 1500 + 30.0 * rows.clone() + 120.0 * torch.randn(50, 50, dtype=torch.float64)
+
+        def gradient(**kwargs):
+            field = rough.clone().requires_grad_(True)
+            Regularization(tgv_weight=1.0, **kwargs)(field, 10.0).backward()
+            return float(field.grad.abs().max())
+
+        shipped = gradient()
+        longer = gradient(tgv_steps=4000)
+        self.assertGreater(shipped, 0.5 * longer,
+                           "the shipped inner solve is too short to be useful")
+
+        tv = rough.clone().requires_grad_(True)
+        Regularization(tv_weight=1.0)(tv, 10.0).backward()
+        self.assertGreater(shipped, 0.2 * float(tv.grad.abs().max()),
+                           "TGV must exert a gradient comparable to TV, not a negligible one")
 
     def test_tgv_still_charges_for_a_discontinuity(self):
         field = ramp()

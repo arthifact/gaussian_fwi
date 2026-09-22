@@ -21,6 +21,13 @@ class Regularization:
     heavily as a fault. ``tgv_weight`` selects second-order total generalized
     variation instead, which prefers piecewise-affine velocity: an exactly
     linear field costs nothing, while discontinuities still do.
+
+    TGV's inner minimization is warm-started at the velocity gradient, where the
+    fidelity term is exactly zero. Too few inner steps leave it there, and the
+    penalty then contributes almost no gradient: at five steps it is some sixty
+    times weaker than TV on a rough field. Check convergence on a field like the
+    one being inverted, not on a smooth one, where the warm start is already
+    optimal and any number of steps looks converged.
     """
 
     tv_weight: float = 0.0
@@ -30,8 +37,8 @@ class Regularization:
     length_scale: float = 10.0
     tgv_weight: float = 0.0
     tgv_ratio: float = 2.0
-    tgv_steps: int = 5
-    tgv_step_size: float = 0.25
+    tgv_steps: int = 500
+    tgv_step_size: float = 2.0
 
     def __post_init__(self) -> None:
         for name in ("tv_weight", "tikhonov_weight", "tgv_weight"):
