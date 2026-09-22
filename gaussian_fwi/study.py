@@ -46,6 +46,10 @@ BASELINE = {
         "epsilon": 0.1,
         "velocity_scale": 100.0,
         "length_scale": 10.0,
+        "tgv_weight": 0.0,
+        "tgv_ratio": 2.0,
+        "tgv_steps": 5,
+        "tgv_step_size": 0.25,
     },
     "preprocessing": {"time_gain_power": 1.5, "trace_balance_cap": 5.0},
     "inversion": {
