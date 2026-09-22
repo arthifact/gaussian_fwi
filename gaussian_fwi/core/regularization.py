@@ -90,11 +90,15 @@ class Regularization:
         """
         gradient = self._gradient(velocity, spacing)
         frozen = gradient.detach()
-        auxiliary = frozen.clone().requires_grad_(True)
-        for _ in range(self.tgv_steps):
-            fidelity, curvature = self._tgv_terms(frozen, auxiliary, spacing)
-            step, = torch.autograd.grad(fidelity + curvature, auxiliary)
-            auxiliary = (auxiliary - self.tgv_step_size * step).detach().requires_grad_(True)
+        # The caller may be inside no_grad: the inversion evaluates this penalty
+        # with gradients disabled at terminal steps and for validation. The inner
+        # descent needs its own graph regardless, so enable it explicitly here.
+        with torch.enable_grad():
+            auxiliary = frozen.clone().requires_grad_(True)
+            for _ in range(self.tgv_steps):
+                fidelity, curvature = self._tgv_terms(frozen, auxiliary, spacing)
+                step, = torch.autograd.grad(fidelity + curvature, auxiliary)
+                auxiliary = (auxiliary - self.tgv_step_size * step).detach().requires_grad_(True)
         fidelity, curvature = self._tgv_terms(gradient, auxiliary.detach(), spacing)
         return fidelity + curvature
 

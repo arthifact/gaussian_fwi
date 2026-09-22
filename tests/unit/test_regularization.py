@@ -70,6 +70,23 @@ class RegularizationTests(unittest.TestCase):
         self.assertIsNotNone(field.grad)
         self.assertTrue(bool(torch.isfinite(field.grad).all()))
 
+    def test_tgv_evaluates_with_gradients_disabled(self):
+        """The inversion scores terminal steps and validation inside no_grad.
+
+        The inner minimisation still needs a graph of its own there, so this
+        is not a corner case: it is the path every completed stage takes.
+        """
+        field = ramp()
+        with torch.no_grad():
+            disabled = float(Regularization(tgv_weight=1.0)(field, 10.0))
+        enabled = float(Regularization(tgv_weight=1.0)(field, 10.0))
+        self.assertAlmostEqual(disabled, enabled, places=12)
+
+        model = ramp().requires_grad_(True)
+        with torch.set_grad_enabled(False):
+            value = Regularization(tgv_weight=1.0)(model, 10.0)
+        self.assertFalse(value.requires_grad, "no_grad must not leak a graph outward")
+
     def test_invalid_tgv_settings_are_rejected(self):
         for kwargs in ({"tgv_weight": -1.0}, {"tgv_ratio": 0.0},
                        {"tgv_steps": 0}, {"tgv_step_size": -0.1}):
