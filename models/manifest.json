@@ -1,0 +1,168 @@
+{
+  "format": "portable-gaussian-fwi-models-v1",
+  "preparation": "scipy.ndimage.zoom(order=1) to 70x70; independent min-max map to 1500--4500 m/s; float32 (z,x)",
+  "scope": "Previously inspected synthetic development models; not unseen surveys",
+  "models": {
+    "marmousi": {
+      "model_id": "marmousi",
+      "family": "Marmousi",
+      "role": "development",
+      "source_file": "marmousi_vp.bin",
+      "source_bytes": 6912204,
+      "source_sha256": "f4302792e84bb7ddbdc9d4d0f963b9df32d9f648960084884127e186119b99dd",
+      "catalog_sha256": "1d5f7355b412cbcd7ad6a7ecfe617062bca40eb3d6ea05a3546193118cf0508e",
+      "source_encoding": "little-endian float32; depth contiguous",
+      "source_velocity_units": "m/s",
+      "velocity_conversion_factor": 1.0,
+      "velocity_units": "m/s",
+      "source_shape_zx": [
+        751,
+        2301
+      ],
+      "source_range_m_s": [
+        1500.0,
+        5500.0
+      ],
+      "prepared_file": "marmousi.npy",
+      "prepared_file_sha256": "c0d2d301c0ea6b9912813f99db009b9b21e7d31b177e1b457a90f6505edcaa2d",
+      "prepared_shape_zx": [
+        70,
+        70
+      ],
+      "prepared_dtype": "float32",
+      "prepared_range_m_s": [
+        1500.0,
+        4500.0
+      ]
+    },
+    "bp2004": {
+      "model_id": "bp2004",
+      "family": "2004 BP",
+      "role": "development",
+      "source_file": "bp_salt _vp.bin",
+      "source_bytes": 41239380,
+      "source_sha256": "8fd949e040c4f4aab61c8911fc280eb4027c648d43790b9b66baf42ce366fbee",
+      "catalog_sha256": "1d5f7355b412cbcd7ad6a7ecfe617062bca40eb3d6ea05a3546193118cf0508e",
+      "source_encoding": "little-endian float32; depth contiguous",
+      "source_velocity_units": "m/s",
+      "velocity_conversion_factor": 1.0,
+      "velocity_units": "m/s",
+      "source_shape_zx": [
+        1911,
+        5395
+      ],
+      "source_range_m_s": [
+        1429.000244140625,
+        4790.0
+      ],
+      "prepared_file": "bp2004.npy",
+      "prepared_file_sha256": "b193b25658ca7ebb7a80cc176f68d500b5441e6fdf642cd9629b1af1aafcce7a",
+      "prepared_shape_zx": [
+        70,
+        70
+      ],
+      "prepared_dtype": "float32",
+      "prepared_range_m_s": [
+        1500.0,
+        4500.0
+      ]
+    },
+    "seam": {
+      "model_id": "seam",
+      "family": "SEAM Phase I",
+      "role": "development",
+      "source_file": "SEAM_I_2D_Model.zip",
+      "source_bytes": 16185850,
+      "source_sha256": "4f44af9dbcdb17ac1c5e4023ccbb804f8c01c5ced618595014baf534acd8e4a6",
+      "catalog_sha256": "1d5f7355b412cbcd7ad6a7ecfe617062bca40eb3d6ea05a3546193118cf0508e",
+      "source_encoding": "ZIP containing IBM float32 SEG-Y",
+      "source_velocity_units": "m/s",
+      "velocity_conversion_factor": 1.0,
+      "velocity_units": "m/s",
+      "source_shape_zx": [
+        1501,
+        1751
+      ],
+      "source_range_m_s": [
+        1490.0,
+        4800.0
+      ],
+      "source_zip_member": "SEAM_I_2D_Model/SEAM_Vp_Elastic_N23900.sgy",
+      "prepared_file": "seam.npy",
+      "prepared_file_sha256": "ca88da5d195a033b75826169da1ced262828127d52c94bf333b998f84caf506b",
+      "prepared_shape_zx": [
+        70,
+        70
+      ],
+      "prepared_dtype": "float32",
+      "prepared_range_m_s": [
+        1500.0,
+        4500.0
+      ]
+    },
+    "overthrust": {
+      "model_id": "overthrust",
+      "family": "Overthrust 2D section",
+      "role": "development",
+      "source_file": "overthrust2D",
+      "source_bytes": 599148,
+      "source_sha256": "ae2ba9104b49506a9d3afc0e00a3493e3c7ec30e48ce769593ca556f18324a56",
+      "catalog_sha256": "1d5f7355b412cbcd7ad6a7ecfe617062bca40eb3d6ea05a3546193118cf0508e",
+      "source_encoding": "little-endian float32; depth contiguous",
+      "source_velocity_units": "m/s",
+      "velocity_conversion_factor": 1.0,
+      "velocity_units": "m/s",
+      "source_shape_zx": [
+        187,
+        801
+      ],
+      "source_range_m_s": [
+        2365.056396484375,
+        6000.0
+      ],
+      "prepared_file": "overthrust.npy",
+      "prepared_file_sha256": "4231c9736f7843787b19ca079f772e1fb8d240f5604d47ab37130e52c06c2b89",
+      "prepared_shape_zx": [
+        70,
+        70
+      ],
+      "prepared_dtype": "float32",
+      "prepared_range_m_s": [
+        1500.0,
+        4500.0
+      ]
+    },
+    "sigsbee2a": {
+      "model_id": "sigsbee2a",
+      "family": "Sigsbee2A stratigraphy",
+      "role": "development",
+      "source_file": "sigsbee2a_stratigraphy.sgy",
+      "source_bytes": 16149444,
+      "source_sha256": "d100d2832a13f013a10a957902b4ba8289f6ccf63b942a04ee853b8a140453c4",
+      "catalog_sha256": "1d5f7355b412cbcd7ad6a7ecfe617062bca40eb3d6ea05a3546193118cf0508e",
+      "source_encoding": "IEEE float32 SEG-Y; ft/s",
+      "source_velocity_units": "ft/s",
+      "velocity_conversion_factor": 0.3048,
+      "velocity_units": "m/s",
+      "source_shape_zx": [
+        1201,
+        3201
+      ],
+      "source_range_m_s": [
+        1437.4347164062501,
+        4511.04
+      ],
+      "prepared_file": "sigsbee2a.npy",
+      "prepared_file_sha256": "90f74ad7f26739bef24b6481be3dea8f415221182c147b63f22771ffe5751a5d",
+      "prepared_shape_zx": [
+        70,
+        70
+      ],
+      "prepared_dtype": "float32",
+      "prepared_range_m_s": [
+        1500.0,
+        4500.0
+      ]
+    }
+  }
+}
