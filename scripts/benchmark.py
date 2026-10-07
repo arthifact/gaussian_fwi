@@ -29,12 +29,13 @@ CONDITIONS = {"snr10": (10.0, (0, 1, 2)), "snr5": (5.0, (0, 1, 2)), "noiseless":
 OUTPUT = Path("results/baseline")
 # Illumination-weighted pull toward the start, applied to the Gaussian and the
 # regularized pixel fits; plain pixel FWI stays unregularized as a reference.
-# The weight was chosen on SEAM, Sigsbee2A and BP 2004 against their true
-# models (scripts/prior_test.py), so Marmousi and Overthrust are the clean
-# check of it.
-PRIOR = {"prior_weight": 0.01, "prior_map": True}
-RUNS = "runs_v4"
-STARTS = "starts_v3"        # fine first grid; "starts" holds the coarse-grid ones
+# Its weight is half the noise fraction measured from each dataset. The factor
+# was set so SNR 10 lands on the 0.01 that tested best on SEAM, Sigsbee2A and
+# BP 2004 against their true models (scripts/prior_test.py), so Marmousi and
+# Overthrust are the clean check of it.
+PRIOR = {"prior_weight": "noise", "prior_map": True}
+RUNS = "runs_v5"
+STARTS = "starts_v5"        # fine grid and receiver smoothing; earlier ones kept
 
 GAUSS_GRID = [{"method": "gauss", "learning_rates": {"amplitude": lr},
                "adapt": {"split_factor": split}}
@@ -59,6 +60,13 @@ def run_one(job):
     start = starting_model(job, survey, observed, reference.shape)
     settings = job["settings"]
     prior_map = (g.prior_weights(survey, start) if settings.get("prior_map") else None)
+    prior_weight = settings.get("prior_weight", 0.0)
+    noise = g.noise_fraction(survey, observed)
+    if prior_weight == "noise":
+        # The pull follows the measured noise: none for clean data, stronger
+        # for noisier data. The factor 1/2 puts SNR 10 at the weight 0.01 that
+        # tested best on SEAM, Sigsbee2A and BP 2004.
+        prior_weight = 0.5 * noise
     if settings["method"] == "gauss":
         model = g.GaussianField(start, survey.spacing)
         adapter = g.Adapter(g.AdaptConfig(**settings.get("adapt", {})))
@@ -67,11 +75,12 @@ def run_one(job):
     result = g.fit(model, survey, observed, steps=job["steps"], adapter=adapter,
                    learning_rates=settings.get("learning_rates"),
                    tv_weight=settings.get("tv_weight", 0.0),
-                   prior_weight=settings.get("prior_weight", 0.0), prior_map=prior_map,
+                   prior_weight=prior_weight, prior_map=prior_map,
                    validation=g.holdout(observed.shape[1]))
     velocity = model().detach()
     row = {key: job[key] for key in ("model", "condition", "seed", "label")}
-    row.update(settings=settings, **result["history"][-1], wall_seconds=result["seconds"],
+    row.update(settings=settings, noise_fraction=noise, prior_weight_used=prior_weight,
+               **result["history"][-1], wall_seconds=result["seconds"],
                edits=result["edits"], **g.velocity_errors(velocity, reference),
                start={key: value for key, value in g.velocity_errors(start, reference).items()})
     path.parent.mkdir(parents=True, exist_ok=True)

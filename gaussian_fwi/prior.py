@@ -71,3 +71,23 @@ def prior(velocity: Tensor, start: Tensor, weights: Tensor | None = None,
     """
     departure = ((velocity - start) / scale).square()
     return (departure if weights is None else weights * departure).mean()
+
+
+def noise_fraction(survey: Survey, observed: Tensor, *, cutoff: float = 12.0,
+                   near_m: float = 100.0) -> float:
+    """In-band noise power as a fraction of total trace power, from the data alone.
+
+    At low frequencies the signal changes smoothly from one receiver to the
+    next, while noise is independent between them. A fourth difference across
+    five neighbouring receivers cancels smooth signal and keeps noise, with
+    variance 70 times the noise variance. Traces within ``near_m`` of their
+    source are left out, where the signal itself curves too sharply for that.
+    """
+    stencil = torch.tensor([1.0, -4.0, 6.0, -4.0, 1.0], dtype=observed.dtype)
+    traces = lowpass(observed, survey.dt, cutoff)
+    fourth = sum(k * traces[:, i:traces.shape[1] - 4 + i] for i, k in enumerate(stencil))
+    offset = (survey.receivers[None, :, 1] - survey.sources[:, None, 1]).abs() * survey.spacing
+    far = offset[:, 2:-2] > near_m
+    noise = fourth.square().mean(-1)[far].mean() / stencil.square().sum()
+    total = traces[:, 2:-2].square().mean(-1)[far].mean()
+    return float(noise / total)

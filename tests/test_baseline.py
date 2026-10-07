@@ -159,6 +159,19 @@ class WaveTests(unittest.TestCase):
         ratio = fine.norm() / coarse.norm()
         self.assertAlmostEqual(float(ratio), 1.0, delta=0.1)
 
+    def test_noise_fraction_tracks_the_noise(self):
+        reference = START.clone()
+        reference[15:25, 10:30] += 400.0
+        config = dict(samples=400, shots=3, refinement=1, wavelet_error=0.0)
+        values = {}
+        for snr in (None, 10.0, 5.0):
+            survey, observed = g.synthetic(reference, g.DataConfig(signal_to_noise=snr, **config))
+            values[snr] = g.noise_fraction(survey, observed)
+        self.assertLess(values[None], 0.002)
+        self.assertGreater(values[10.0], 10 * values[None])
+        # Halving the amplitude ratio quadruples the noise power fraction.
+        self.assertAlmostEqual(values[5.0] / values[10.0], 4.0, delta=1.0)
+
     def test_start_recovers_a_depth_trend(self):
         reference = g.linear_start((40, 40), 1800.0, 3600.0)
         survey, observed = g.synthetic(reference, g.DataConfig(
