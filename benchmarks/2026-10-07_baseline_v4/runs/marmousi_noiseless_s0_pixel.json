@@ -1,0 +1,32 @@
+{
+  "model": "marmousi",
+  "condition": "noiseless",
+  "seed": 0,
+  "label": "pixel",
+  "settings": {
+    "method": "pixel",
+    "learning_rates": {
+      "change": 10.0
+    },
+    "tv_weight": 0.03,
+    "prior_weight": 0.01,
+    "prior_map": true
+  },
+  "cutoff_hz": 20.0,
+  "parameters": 4900,
+  "train_misfit": 0.02089216560125351,
+  "validation_misfit": 0.02283059060573578,
+  "seconds": 219.9,
+  "wall_seconds": 219.9,
+  "edits": [],
+  "rmse": 447.7974752817771,
+  "rmse_illuminated": 166.45534973714123,
+  "rmse_deep": 574.5728634631108,
+  "roughness": 56.92063924324613,
+  "start": {
+    "rmse": 436.83961243329674,
+    "rmse_illuminated": 242.84857550951818,
+    "rmse_deep": 538.2554312441035,
+    "roughness": 0.00014540728400735294
+  }
+}
