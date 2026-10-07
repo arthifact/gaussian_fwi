@@ -1,0 +1,30 @@
+{
+  "model": "sigsbee2a",
+  "condition": "snr5",
+  "seed": 1,
+  "label": "pixel_plain",
+  "settings": {
+    "method": "pixel",
+    "learning_rates": {
+      "change": 10.0
+    },
+    "tv_weight": 0.0
+  },
+  "cutoff_hz": 20.0,
+  "parameters": 4900,
+  "train_misfit": 0.45665061473846436,
+  "validation_misfit": 0.463437020778656,
+  "seconds": 261.7,
+  "wall_seconds": 261.7,
+  "edits": [],
+  "rmse": 773.474371609647,
+  "rmse_illuminated": 597.7240088910006,
+  "rmse_deep": 882.6120682871357,
+  "roughness": 335.5533960422548,
+  "start": {
+    "rmse": 828.5645229771916,
+    "rmse_illuminated": 797.1670224534406,
+    "rmse_deep": 851.3530989097727,
+    "roughness": 0.00018310546875
+  }
+}
