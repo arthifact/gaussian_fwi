@@ -1,0 +1,227 @@
+{
+  "model": "bp2004",
+  "condition": "snr10",
+  "seed": 1,
+  "label": "gauss mapped0.1",
+  "settings": {
+    "method": "gauss",
+    "learning_rates": {
+      "amplitude": 5.0
+    },
+    "adapt": {
+      "split_factor": 1.5
+    },
+    "prior_weight": 0.1,
+    "prior_map": true
+  },
+  "cutoff_hz": 20.0,
+  "parameters": 210,
+  "train_misfit": 0.1892787516117096,
+  "validation_misfit": 0.18606269359588623,
+  "seconds": 272.4,
+  "wall_seconds": 272.4,
+  "edits": [
+    {
+      "step": 9,
+      "cutoff_hz": 4.0,
+      "before": 64,
+      "after": 48,
+      "pruned": 1,
+      "merged": 15,
+      "split": 0,
+      "split_resolution_m": 87.5,
+      "growing": true,
+      "validation_misfit": 0.4074363708496094
+    },
+    {
+      "step": 18,
+      "cutoff_hz": 4.0,
+      "before": 48,
+      "after": 40,
+      "pruned": 1,
+      "merged": 7,
+      "split": 0,
+      "split_resolution_m": 87.5,
+      "growing": true,
+      "validation_misfit": 0.38122832775115967
+    },
+    {
+      "step": 27,
+      "cutoff_hz": 4.0,
+      "before": 40,
+      "after": 36,
+      "pruned": 1,
+      "merged": 3,
+      "split": 0,
+      "split_resolution_m": 87.5,
+      "growing": true,
+      "validation_misfit": 0.37165209650993347
+    },
+    {
+      "step": 36,
+      "cutoff_hz": 4.0,
+      "before": 36,
+      "after": 37,
+      "pruned": 0,
+      "merged": 1,
+      "split": 2,
+      "split_resolution_m": 87.5,
+      "growing": true,
+      "validation_misfit": 0.36529064178466797
+    },
+    {
+      "step": 69,
+      "cutoff_hz": 7.0,
+      "before": 37,
+      "after": 46,
+      "pruned": 1,
+      "merged": 1,
+      "split": 11,
+      "split_resolution_m": 50.0,
+      "growing": true,
+      "validation_misfit": 0.26828813552856445
+    },
+    {
+      "step": 78,
+      "cutoff_hz": 7.0,
+      "before": 46,
+      "after": 42,
+      "pruned": 0,
+      "merged": 10,
+      "split": 6,
+      "split_resolution_m": 50.0,
+      "growing": true,
+      "validation_misfit": 0.26454925537109375
+    },
+    {
+      "step": 87,
+      "cutoff_hz": 7.0,
+      "before": 42,
+      "after": 35,
+      "pruned": 1,
+      "merged": 6,
+      "split": 0,
+      "split_resolution_m": 50.0,
+      "growing": false,
+      "validation_misfit": 0.26291292905807495
+    },
+    {
+      "step": 96,
+      "cutoff_hz": 7.0,
+      "before": 35,
+      "after": 34,
+      "pruned": 1,
+      "merged": 0,
+      "split": 0,
+      "split_resolution_m": 50.0,
+      "growing": false,
+      "validation_misfit": 0.261671781539917
+    },
+    {
+      "step": 129,
+      "cutoff_hz": 12.0,
+      "before": 34,
+      "after": 46,
+      "pruned": 0,
+      "merged": 0,
+      "split": 12,
+      "split_resolution_m": 29.2,
+      "growing": true,
+      "validation_misfit": 0.22047178447246552
+    },
+    {
+      "step": 138,
+      "cutoff_hz": 12.0,
+      "before": 46,
+      "after": 37,
+      "pruned": 0,
+      "merged": 12,
+      "split": 3,
+      "split_resolution_m": 29.2,
+      "growing": true,
+      "validation_misfit": 0.21740932762622833
+    },
+    {
+      "step": 147,
+      "cutoff_hz": 12.0,
+      "before": 37,
+      "after": 34,
+      "pruned": 0,
+      "merged": 3,
+      "split": 0,
+      "split_resolution_m": 29.2,
+      "growing": false,
+      "validation_misfit": 0.21533067524433136
+    },
+    {
+      "step": 156,
+      "cutoff_hz": 12.0,
+      "before": 34,
+      "after": 34,
+      "pruned": 0,
+      "merged": 0,
+      "split": 0,
+      "split_resolution_m": 29.2,
+      "growing": false,
+      "validation_misfit": 0.21299536526203156
+    },
+    {
+      "step": 189,
+      "cutoff_hz": 20.0,
+      "before": 34,
+      "after": 47,
+      "pruned": 1,
+      "merged": 0,
+      "split": 14,
+      "split_resolution_m": 17.5,
+      "growing": true,
+      "validation_misfit": 0.19557563960552216
+    },
+    {
+      "step": 198,
+      "cutoff_hz": 20.0,
+      "before": 47,
+      "after": 36,
+      "pruned": 0,
+      "merged": 13,
+      "split": 2,
+      "split_resolution_m": 17.5,
+      "growing": true,
+      "validation_misfit": 0.19208291172981262
+    },
+    {
+      "step": 207,
+      "cutoff_hz": 20.0,
+      "before": 36,
+      "after": 47,
+      "pruned": 0,
+      "merged": 2,
+      "split": 13,
+      "split_resolution_m": 17.5,
+      "growing": true,
+      "validation_misfit": 0.18935903906822205
+    },
+    {
+      "step": 216,
+      "cutoff_hz": 20.0,
+      "before": 47,
+      "after": 35,
+      "pruned": 0,
+      "merged": 12,
+      "split": 0,
+      "split_resolution_m": 17.5,
+      "growing": false,
+      "validation_misfit": 0.18840810656547546
+    }
+  ],
+  "rmse": 641.0218677152317,
+  "rmse_illuminated": 754.0934459915446,
+  "rmse_deep": 540.9233929961017,
+  "roughness": 22.095030302159927,
+  "start": {
+    "rmse": 738.03155083414,
+    "rmse_illuminated": 944.6268991512321,
+    "rmse_deep": 532.8869613685215,
+    "roughness": 0.00016156364889705882
+  }
+}

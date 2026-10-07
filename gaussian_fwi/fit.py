@@ -14,23 +14,13 @@ from torch import Tensor
 
 from .adapt import Adapter
 from .field import GaussianField
+from .prior import prior
 from .wave import Survey, lowpass
 
 
 def holdout(receivers: int, every: int = 5) -> Tensor:
     """Every ``every``-th receiver, kept out of the misfit for validation."""
     return torch.arange(receivers) % every == every // 2
-
-
-def prior(velocity: Tensor, start: Tensor, scale: float = 500.0) -> Tensor:
-    """Mean squared departure from the starting model, in units of ``scale`` m/s.
-
-    A Gaussian prior centred on the start. Where the data constrain velocity
-    it is outweighed; where they do not, it returns velocity to the start.
-    Its weight is a stated assumption: held-out traces cannot choose it,
-    because the regions it acts on barely change the traces.
-    """
-    return ((velocity - start) / scale).square().mean()
 
 
 def total_variation(velocity: Tensor, scale: float = 100.0) -> Tensor:
@@ -63,7 +53,7 @@ class Misfit:
 
 def fit(model, survey: Survey, observed: Tensor, *, cutoffs=(4.0, 7.0, 12.0, 20.0),
         steps: int = 100, learning_rates: dict | None = None, adapter: Adapter | None = None,
-        tv_weight: float = 0.0, prior_weight: float = 0.0,
+        tv_weight: float = 0.0, prior_weight: float = 0.0, prior_map: Tensor | None = None,
         validation: Tensor | None = None, verbose: bool = False):
     """Fit ``model`` in place. Returns a history of losses and population edits."""
     misfit = Misfit(observed, survey.dt, cutoffs, validation=validation)
@@ -84,7 +74,7 @@ def fit(model, survey: Survey, observed: Tensor, *, cutoffs=(4.0, 7.0, 12.0, 20.
             if tv_weight:
                 loss = loss + tv_weight * total_variation(velocity)
             if prior_weight:
-                loss = loss + prior_weight * prior(velocity, model.start)
+                loss = loss + prior_weight * prior(velocity, model.start, prior_map)
             loss.backward()
             if adaptive:
                 adapter.observe(model, velocity.grad)

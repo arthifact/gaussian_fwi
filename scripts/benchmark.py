@@ -27,6 +27,13 @@ MODELS = ("marmousi", "overthrust", "bp2004", "seam", "sigsbee2a")
 # name: (signal-to-noise or None, noise seeds)
 CONDITIONS = {"snr10": (10.0, (0, 1, 2)), "snr5": (5.0, (0, 1, 2)), "noiseless": (None, (0,))}
 OUTPUT = Path("results/baseline")
+# Illumination-weighted pull toward the start, applied to the Gaussian and the
+# regularized pixel fits; plain pixel FWI stays unregularized as a reference.
+# The weight was chosen on SEAM, Sigsbee2A and BP 2004 against their true
+# models (scripts/prior_test.py), so Marmousi and Overthrust are the clean
+# check of it.
+PRIOR = {"prior_weight": 0.01, "prior_map": True}
+RUNS = "runs_pull"
 
 GAUSS_GRID = [{"method": "gauss", "learning_rates": {"amplitude": lr},
                "adapt": {"split_factor": split}}
@@ -50,6 +57,7 @@ def run_one(job):
         signal_to_noise=job["snr"], seed=job["seed"]))
     start = starting_model(job, survey, observed, reference.shape)
     settings = job["settings"]
+    prior_map = (g.prior_weights(survey, start) if settings.get("prior_map") else None)
     if settings["method"] == "gauss":
         model = g.GaussianField(start, survey.spacing)
         adapter = g.Adapter(g.AdaptConfig(**settings.get("adapt", {})))
@@ -58,7 +66,7 @@ def run_one(job):
     result = g.fit(model, survey, observed, steps=job["steps"], adapter=adapter,
                    learning_rates=settings.get("learning_rates"),
                    tv_weight=settings.get("tv_weight", 0.0),
-                   prior_weight=settings.get("prior_weight", 0.0),
+                   prior_weight=settings.get("prior_weight", 0.0), prior_map=prior_map,
                    validation=g.holdout(observed.shape[1]))
     velocity = model().detach()
     row = {key: job[key] for key in ("model", "condition", "seed", "label")}
@@ -156,15 +164,17 @@ def run(args):
     jobs = []
     for model, (condition, (snr, seeds)) in itertools.product(MODELS, CONDITIONS.items()):
         for seed, (name, settings) in itertools.product(seeds, chosen.items()):
+            if name != "pixel_plain":
+                settings = dict(settings, **PRIOR)
             jobs.append({"model": model, "condition": condition, "snr": snr, "seed": seed,
                          "settings": settings, "label": name, "steps": args.steps,
                          "threads": args.threads,
-                         "path": str(OUTPUT / "runs" / f"{model}_{condition}_s{seed}_{name}")})
+                         "path": str(OUTPUT / RUNS / f"{model}_{condition}_s{seed}_{name}")})
     execute(jobs, args.workers)
 
 
 def report(args):
-    rows = [json.loads(p.read_text()) for p in sorted((OUTPUT / "runs").glob("*.json"))]
+    rows = [json.loads(p.read_text()) for p in sorted((OUTPUT / RUNS).glob("*.json"))]
     methods = sorted({r["label"] for r in rows})
     keys = ("rmse", "rmse_illuminated", "rmse_deep", "roughness")
     lines = ["| Model | Condition | Method | RMSE | RMSE <300 m | RMSE >300 m | Roughness | "
@@ -203,7 +213,7 @@ def report(args):
                      + (": " + ", ".join(sorted({f"{r['model']}/{r['condition']}" for r in worse}))
                         if worse else ""))
     text = "\n".join(lines)
-    (OUTPUT / "report.md").write_text(text + "\n")
+    (OUTPUT / f"report_{RUNS}.md").write_text(text + "\n")
     print(text)
     figure(rows, methods)
 
@@ -221,7 +231,7 @@ def figure(rows, methods):
         reference = np.load(f"models/{model}.npy")
         panels = [("Reference", reference), ("Start", g.linear_start(reference.shape).numpy())]
         for method in methods:
-            path = OUTPUT / "runs" / f"{model}_snr10_s0_{method}.npy"
+            path = OUTPUT / RUNS / f"{model}_snr10_s0_{method}.npy"
             if path.exists():
                 row = json.loads(path.with_suffix(".json").read_text())
                 panels.append((f"{method}: {row['rmse']:.0f} m/s", np.load(path)))
@@ -230,7 +240,7 @@ def figure(rows, methods):
             axis.set_title(f"{model}\n{title}" if title == "Reference" else title, fontsize=8)
             axis.axhline(300, color="w", lw=.8, ls="--")
             axis.tick_params(labelsize=6)
-    fig.savefig(OUTPUT / "baseline.png", dpi=150)
+    fig.savefig(OUTPUT / f"baseline_{RUNS}.png", dpi=150)
 
 
 def main():
