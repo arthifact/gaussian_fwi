@@ -1,0 +1,32 @@
+{
+  "model": "overthrust",
+  "condition": "snr5",
+  "seed": 0,
+  "label": "pixel",
+  "settings": {
+    "method": "pixel",
+    "learning_rates": {
+      "change": 10.0
+    },
+    "tv_weight": 0.03,
+    "prior_weight": 0.01,
+    "prior_map": true
+  },
+  "cutoff_hz": 20.0,
+  "parameters": 4900,
+  "train_misfit": 0.6404085755348206,
+  "validation_misfit": 0.6230192184448242,
+  "seconds": 252.8,
+  "wall_seconds": 252.8,
+  "edits": [],
+  "rmse": 356.01317906351403,
+  "rmse_illuminated": 315.79347058725534,
+  "rmse_deep": 383.41920187691983,
+  "roughness": 40.49203037294019,
+  "start": {
+    "rmse": 382.9670215543031,
+    "rmse_illuminated": 389.97865169217914,
+    "rmse_deep": 377.62287101692743,
+    "roughness": 0.00020644244025735294
+  }
+}
