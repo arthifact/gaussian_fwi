@@ -44,10 +44,11 @@ from .field import PARAMETERS, GaussianField, gaussian_kernels
 class AdaptConfig:
     edits_per_band: int = 4         # evenly spaced over the editing part of each band
     stop_fraction: float = 0.6      # no edits in the last 40% of each band
-    min_age: int = 1                # edits a Gaussian must survive before prune or merge
-    max_gaussians: int = 400
-    max_splits: int = 24            # per edit
-    max_merges: int = 24            # per edit
+    min_age: int = 1                # edits a Gaussian must survive before it can be pruned
+    merge_age: int | None = None    # edits before it can be merged; None = one full band
+    max_gaussians: int | None = None  # safety bound only; None = one per grid cell
+    max_splits: int | None = None   # per edit; None = every candidate the data select
+    max_merges: int | None = None   # per edit; None = every redundant pair
     split_factor: float = 1.0       # split if score exceeds this multiple of the median
     min_improvement: float = 0.01   # relative held-out improvement that keeps growth going
     resolution: float = 0.25        # smallest split child width, in wavelengths
@@ -134,7 +135,12 @@ class Adapter:
         prune = established & (values["amplitude"].abs() < cfg.prune_amplitude)
         alive = ~prune
 
-        merged_pairs = self._merges(field, values, alive & established)
+        # A split's children start almost identical to their parent. Merging
+        # them before they have had a band to diverge undoes the split before
+        # the data could use it, which held the population in place.
+        merge_age = cfg.edits_per_band if cfg.merge_age is None else cfg.merge_age
+        mergeable = old_age >= merge_age * self.interval
+        merged_pairs = self._merges(field, values, alive & mergeable)
         for i, j in merged_pairs:
             alive[i] = alive[j] = False
 
@@ -144,8 +150,11 @@ class Adapter:
         threshold = cfg.split_factor * score[alive].median() if alive.any() else math.inf
         candidates &= score > threshold
         order = torch.argsort(score.masked_fill(~candidates, -math.inf), descending=True)
-        room = cfg.max_gaussians - (int(alive.sum()) + len(merged_pairs))
-        allowed = min(cfg.max_splits, room, int(candidates.sum())) if self.growing else 0
+        ceiling = field.start.numel() if cfg.max_gaussians is None else cfg.max_gaussians
+        room = ceiling - (int(alive.sum()) + len(merged_pairs))
+        allowed = min(room, int(candidates.sum())) if self.growing else 0
+        if cfg.max_splits is not None:
+            allowed = min(allowed, cfg.max_splits)
         splits = order[:max(0, allowed)].tolist()
         for i in splits:
             alive[i] = False
@@ -195,7 +204,7 @@ class Adapter:
         pairs = pairs[torch.argsort(distance[close])]
         used, chosen = set(), []
         for a, b in pairs.tolist():
-            if len(chosen) >= cfg.max_merges:
+            if cfg.max_merges is not None and len(chosen) >= cfg.max_merges:
                 break
             i, j = int(index[a]), int(index[b])
             if i in used or j in used:

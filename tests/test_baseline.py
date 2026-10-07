@@ -120,6 +120,21 @@ class AdaptTests(unittest.TestCase):
         self.assertEqual(adapter.log[-1]["split"], 0)
 
 
+    def test_split_children_are_not_merged_straight_back(self):
+        field = populated(lattice=2)
+        field.age[:] = 100
+        optimizer = with_state(field)
+        adapter = Adapter(AdaptConfig(split_factor=0.0, prune_amplitude=0.0))
+        adapter.start_band(steps=40)                 # four edits, nine steps apart
+        adapter.observe(field, torch.randn(START.numel()))
+        optimizer = adapter.edit(field, optimizer, 4.0, 9)
+        self.assertEqual(field.count, 8)
+        field.age += adapter.interval                # one edit later, still one band young
+        adapter.observe(field, torch.zeros(START.numel()))
+        adapter.config = AdaptConfig(split_factor=1e9, prune_amplitude=0.0)
+        adapter.edit(field, optimizer, 4.0, 18)
+        self.assertEqual(adapter.log[-1]["merged"], 0)
+
     def test_growth_stops_when_held_out_fit_stops_improving(self):
         field = populated()
         optimizer = with_state(field)

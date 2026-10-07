@@ -33,7 +33,7 @@ OUTPUT = Path("results/baseline")
 # models (scripts/prior_test.py), so Marmousi and Overthrust are the clean
 # check of it.
 PRIOR = {"prior_weight": 0.01, "prior_map": True}
-RUNS = "runs_v3"
+RUNS = "runs_v4"
 STARTS = "starts_v3"        # fine first grid; "starts" holds the coarse-grid ones
 
 GAUSS_GRID = [{"method": "gauss", "learning_rates": {"amplitude": lr},
