@@ -22,6 +22,17 @@ def holdout(receivers: int, every: int = 5) -> Tensor:
     return torch.arange(receivers) % every == every // 2
 
 
+def prior(velocity: Tensor, start: Tensor, scale: float = 500.0) -> Tensor:
+    """Mean squared departure from the starting model, in units of ``scale`` m/s.
+
+    A Gaussian prior centred on the start. Where the data constrain velocity
+    it is outweighed; where they do not, it returns velocity to the start.
+    Its weight is a stated assumption: held-out traces cannot choose it,
+    because the regions it acts on barely change the traces.
+    """
+    return ((velocity - start) / scale).square().mean()
+
+
 def total_variation(velocity: Tensor, scale: float = 100.0) -> Tensor:
     """Mean smoothed gradient magnitude, per ``scale`` m/s per cell."""
     dz = velocity[1:, :-1] - velocity[:-1, :-1]
@@ -52,7 +63,8 @@ class Misfit:
 
 def fit(model, survey: Survey, observed: Tensor, *, cutoffs=(4.0, 7.0, 12.0, 20.0),
         steps: int = 100, learning_rates: dict | None = None, adapter: Adapter | None = None,
-        tv_weight: float = 0.0, validation: Tensor | None = None, verbose: bool = False):
+        tv_weight: float = 0.0, prior_weight: float = 0.0,
+        validation: Tensor | None = None, verbose: bool = False):
     """Fit ``model`` in place. Returns a history of losses and population edits."""
     misfit = Misfit(observed, survey.dt, cutoffs, validation=validation)
     optimizer = torch.optim.Adam(model.parameter_groups(**(learning_rates or {})))
@@ -62,7 +74,7 @@ def fit(model, survey: Survey, observed: Tensor, *, cutoffs=(4.0, 7.0, 12.0, 20.
         bands = cutoffs[:stage + 1]
         if adaptive:
             adapter.reset()
-            adapter.start_band()
+            adapter.start_band(steps)
         for step in range(steps):
             optimizer.zero_grad(set_to_none=True)
             velocity = model()
@@ -71,6 +83,8 @@ def fit(model, survey: Survey, observed: Tensor, *, cutoffs=(4.0, 7.0, 12.0, 20.
             loss = misfit(predicted, bands)
             if tv_weight:
                 loss = loss + tv_weight * total_variation(velocity)
+            if prior_weight:
+                loss = loss + prior_weight * prior(velocity, model.start)
             loss.backward()
             if adaptive:
                 adapter.observe(model, velocity.grad)

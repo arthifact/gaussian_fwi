@@ -163,7 +163,7 @@ class WaveTests(unittest.TestCase):
             samples=400, shots=3, signal_to_noise=None, wavelet_error=0.0, refinement=1))
         field = g.GaussianField(START, 10.0, lattice=3)
         result = g.fit(field, survey, observed, cutoffs=(6.0, 10.0), steps=60,
-                       adapter=Adapter(AdaptConfig(interval=10, min_age=10)),
+                       adapter=Adapter(),
                        validation=g.holdout(observed.shape[1]))
         last = result["history"][-1]
         self.assertLess(last["train_misfit"], 0.5)

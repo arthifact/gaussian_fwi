@@ -42,9 +42,9 @@ from .field import PARAMETERS, GaussianField, gaussian_kernels
 
 @dataclass(frozen=True)
 class AdaptConfig:
-    interval: int = 20              # steps between edits
+    edits_per_band: int = 4         # evenly spaced over the editing part of each band
     stop_fraction: float = 0.6      # no edits in the last 40% of each band
-    min_age: int = 20               # steps a Gaussian must exist before prune or merge
+    min_age: int = 1                # edits a Gaussian must survive before prune or merge
     max_gaussians: int = 400
     max_splits: int = 24            # per edit
     max_merges: int = 24            # per edit
@@ -77,13 +77,21 @@ class Adapter:
 
     def __init__(self, config: AdaptConfig = AdaptConfig()):
         self.config = config
+        self.interval = 1
         self.reset()
         self.start_band()
         self.log: list[dict] = []
 
-    def start_band(self) -> None:
-        """New frequencies may justify new detail: allow growth again."""
+    def start_band(self, steps: int | None = None) -> None:
+        """New frequencies may justify new detail: allow growth again.
+
+        Edits are spaced so each band of ``steps`` updates gets
+        ``edits_per_band`` of them, which the growth stop needs to compare.
+        """
         self.growing, self.previous = True, None
+        if steps is not None:
+            editing = int(self.config.stop_fraction * steps)
+            self.interval = max(1, editing // self.config.edits_per_band)
 
     def reset(self) -> None:
         self.score, self.samples = None, 0
@@ -99,8 +107,8 @@ class Adapter:
         self.samples += 1
 
     def due(self, step: int, steps: int) -> bool:
-        return step > 0 and step % self.config.interval == 0 \
-            and step < self.config.stop_fraction * steps
+        return step > 0 and step % self.interval == 0 \
+            and step <= self.config.stop_fraction * steps
 
     @torch.no_grad()
     def edit(self, field: GaussianField, optimizer, cutoff_hz: float, step: int,
@@ -122,7 +130,7 @@ class Adapter:
         score = self.score / max(self.samples, 1)
         self.reset()
 
-        established = old_age >= cfg.min_age
+        established = old_age >= cfg.min_age * self.interval
         prune = established & (values["amplitude"].abs() < cfg.prune_amplitude)
         alive = ~prune
 

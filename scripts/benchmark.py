@@ -58,6 +58,7 @@ def run_one(job):
     result = g.fit(model, survey, observed, steps=job["steps"], adapter=adapter,
                    learning_rates=settings.get("learning_rates"),
                    tv_weight=settings.get("tv_weight", 0.0),
+                   prior_weight=settings.get("prior_weight", 0.0),
                    validation=g.holdout(observed.shape[1]))
     velocity = model().detach()
     row = {key: job[key] for key in ("model", "condition", "seed", "label")}
