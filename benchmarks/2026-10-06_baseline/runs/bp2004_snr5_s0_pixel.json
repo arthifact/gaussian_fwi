@@ -1,0 +1,30 @@
+{
+  "model": "bp2004",
+  "condition": "snr5",
+  "seed": 0,
+  "label": "pixel",
+  "settings": {
+    "method": "pixel",
+    "learning_rates": {
+      "change": 10.0
+    },
+    "tv_weight": 0.03
+  },
+  "cutoff_hz": 20.0,
+  "parameters": 4900,
+  "train_misfit": 0.4055083692073822,
+  "validation_misfit": 0.39185601472854614,
+  "seconds": 241.7,
+  "wall_seconds": 241.7,
+  "edits": [],
+  "rmse": 584.8301373998124,
+  "rmse_illuminated": 609.1253303679322,
+  "rmse_deep": 565.9246908799033,
+  "roughness": 54.144027863831084,
+  "start": {
+    "rmse": 738.03155083414,
+    "rmse_illuminated": 944.6268991512321,
+    "rmse_deep": 532.8869613685215,
+    "roughness": 0.00016156364889705882
+  }
+}

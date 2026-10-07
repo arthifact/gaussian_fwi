@@ -1,0 +1,30 @@
+{
+  "model": "seam",
+  "condition": "snr10",
+  "seed": 1,
+  "label": "pixel_plain",
+  "settings": {
+    "method": "pixel",
+    "learning_rates": {
+      "change": 10.0
+    },
+    "tv_weight": 0.0
+  },
+  "cutoff_hz": 20.0,
+  "parameters": 4900,
+  "train_misfit": 0.2077702134847641,
+  "validation_misfit": 0.2069411724805832,
+  "seconds": 244.7,
+  "wall_seconds": 244.7,
+  "edits": [],
+  "rmse": 413.64284393645204,
+  "rmse_illuminated": 414.74748862674153,
+  "rmse_deep": 412.8124206017441,
+  "roughness": 129.34723041438255,
+  "start": {
+    "rmse": 593.666913276025,
+    "rmse_illuminated": 730.1149410855882,
+    "rmse_deep": 465.80021088486734,
+    "roughness": 9.334788602941176e-05
+  }
+}

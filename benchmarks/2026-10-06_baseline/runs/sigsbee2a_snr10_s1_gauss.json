@@ -1,0 +1,81 @@
+{
+  "model": "sigsbee2a",
+  "condition": "snr10",
+  "seed": 1,
+  "label": "gauss",
+  "settings": {
+    "method": "gauss",
+    "learning_rates": {
+      "amplitude": 5.0
+    },
+    "adapt": {
+      "split_factor": 1.5
+    }
+  },
+  "cutoff_hz": 20.0,
+  "parameters": 396,
+  "train_misfit": 0.21332617104053497,
+  "validation_misfit": 0.21089713275432587,
+  "seconds": 238.4,
+  "wall_seconds": 238.4,
+  "edits": [
+    {
+      "step": 20,
+      "cutoff_hz": 4.0,
+      "before": 64,
+      "after": 47,
+      "pruned": 1,
+      "merged": 16,
+      "split": 0,
+      "split_resolution_m": 87.8,
+      "growing": true,
+      "validation_misfit": 0.40104177594184875
+    },
+    {
+      "step": 80,
+      "cutoff_hz": 7.0,
+      "before": 47,
+      "after": 52,
+      "pruned": 0,
+      "merged": 5,
+      "split": 10,
+      "split_resolution_m": 52.6,
+      "growing": true,
+      "validation_misfit": 0.29691407084465027
+    },
+    {
+      "step": 140,
+      "cutoff_hz": 12.0,
+      "before": 52,
+      "after": 65,
+      "pruned": 1,
+      "merged": 3,
+      "split": 17,
+      "split_resolution_m": 30.4,
+      "growing": true,
+      "validation_misfit": 0.24276064336299896
+    },
+    {
+      "step": 200,
+      "cutoff_hz": 20.0,
+      "before": 65,
+      "after": 66,
+      "pruned": 2,
+      "merged": 10,
+      "split": 13,
+      "split_resolution_m": 17.7,
+      "growing": true,
+      "validation_misfit": 0.21541938185691833
+    }
+  ],
+  "rmse": 995.312725645042,
+  "rmse_illuminated": 524.2316394380156,
+  "rmse_deep": 1235.9283471800793,
+  "roughness": 38.00072203564043,
+  "start": {
+    "rmse": 837.5472981503341,
+    "rmse_illuminated": 800.0998806166748,
+    "rmse_deep": 864.5690949230174,
+    "roughness": 0.00016515395220588236
+  }
+}
