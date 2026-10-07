@@ -33,7 +33,8 @@ OUTPUT = Path("results/baseline")
 # models (scripts/prior_test.py), so Marmousi and Overthrust are the clean
 # check of it.
 PRIOR = {"prior_weight": 0.01, "prior_map": True}
-RUNS = "runs_pull"
+RUNS = "runs_v3"
+STARTS = "starts_v3"        # fine first grid; "starts" holds the coarse-grid ones
 
 GAUSS_GRID = [{"method": "gauss", "learning_rates": {"amplitude": lr},
                "adapt": {"split_factor": split}}
@@ -83,7 +84,7 @@ def starting_model(job, survey, observed, shape):
     """The data-estimated start for this dataset, computed once and shared by all methods."""
     import gaussian_fwi as g
 
-    path = OUTPUT / "starts" / f"{job['model']}_{job['condition']}_s{job['seed']}.json"
+    path = OUTPUT / STARTS / f"{job['model']}_{job['condition']}_s{job['seed']}.json"
     if path.exists():
         info = json.loads(path.read_text())
     else:

@@ -148,7 +148,7 @@ class WaveTests(unittest.TestCase):
         reference = g.linear_start((40, 40), 1800.0, 3600.0)
         survey, observed = g.synthetic(reference, g.DataConfig(
             samples=400, shots=3, signal_to_noise=None, wavelet_error=0.0, refinement=1))
-        start, info = g.estimate_start(survey, observed, (40, 40), points=7, refinements=1)
+        start, info = g.estimate_start(survey, observed, (40, 40), top=(1500.0, 2100.0, 7), bottom=(2400.0, 4800.0, 7), refinements=1)
         # A 380 m spread over a 0.4 s record constrains the shallow part best;
         # below that the trend is an extrapolation and is not checked.
         error = (start[:10] - reference[:10]).abs().mean()
