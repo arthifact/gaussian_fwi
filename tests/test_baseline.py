@@ -144,6 +144,17 @@ class WaveTests(unittest.TestCase):
         ratio = fine.norm() / coarse.norm()
         self.assertAlmostEqual(float(ratio), 1.0, delta=0.1)
 
+    def test_start_recovers_a_depth_trend(self):
+        reference = g.linear_start((40, 40), 1800.0, 3600.0)
+        survey, observed = g.synthetic(reference, g.DataConfig(
+            samples=400, shots=3, signal_to_noise=None, wavelet_error=0.0, refinement=1))
+        start, info = g.estimate_start(survey, observed, (40, 40), points=7, refinements=1)
+        # A 380 m spread over a 0.4 s record constrains the shallow part best;
+        # below that the trend is an extrapolation and is not checked.
+        error = (start[:10] - reference[:10]).abs().mean()
+        self.assertLess(float(error), 100.0)
+        self.assertAlmostEqual(info["top_m_s"], 1800.0, delta=100.0)
+
     def test_fit_reduces_misfit_and_adapts(self):
         torch.manual_seed(0)
         reference = START.clone()

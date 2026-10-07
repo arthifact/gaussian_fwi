@@ -5,10 +5,11 @@ from .data import DataConfig, synthetic
 from .field import GaussianField, PixelField, linear_start
 from .fit import fit, holdout
 from .metrics import velocity_errors
+from .start import estimate_start
 from .wave import Survey, lowpass, ricker, surface_survey
 
 __all__ = [
-    "AdaptConfig", "Adapter", "DataConfig", "GaussianField", "PixelField", "Survey",
+    "AdaptConfig", "Adapter", "DataConfig", "GaussianField", "PixelField", "Survey", "estimate_start",
     "fit", "holdout", "linear_start", "lowpass", "ricker", "surface_survey", "synthetic",
     "velocity_errors",
 ]

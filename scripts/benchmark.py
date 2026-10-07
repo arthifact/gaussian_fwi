@@ -48,7 +48,7 @@ def run_one(job):
     reference = torch.from_numpy(np.load(f"models/{job['model']}.npy"))
     survey, observed = g.synthetic(reference, g.DataConfig(
         signal_to_noise=job["snr"], seed=job["seed"]))
-    start = g.linear_start(reference.shape)
+    start = starting_model(job, survey, observed, reference.shape)
     settings = job["settings"]
     if settings["method"] == "gauss":
         model = g.GaussianField(start, survey.spacing)
@@ -62,11 +62,47 @@ def run_one(job):
     velocity = model().detach()
     row = {key: job[key] for key in ("model", "condition", "seed", "label")}
     row.update(settings=settings, **result["history"][-1], wall_seconds=result["seconds"],
-               edits=result["edits"], **g.velocity_errors(velocity, reference))
+               edits=result["edits"], **g.velocity_errors(velocity, reference),
+               start={key: value for key, value in g.velocity_errors(start, reference).items()})
     path.parent.mkdir(parents=True, exist_ok=True)
     np.save(path.with_suffix(".npy"), velocity.numpy())
     path.with_suffix(".json").write_text(json.dumps(row, indent=2) + "\n")
     return row
+
+
+def starting_model(job, survey, observed, shape):
+    """The data-estimated start for this dataset, computed once and shared by all methods."""
+    import gaussian_fwi as g
+
+    path = OUTPUT / "starts" / f"{job['model']}_{job['condition']}_s{job['seed']}.json"
+    if path.exists():
+        info = json.loads(path.read_text())
+    else:
+        _, info = g.estimate_start(survey, observed, shape,
+                                   validation=g.holdout(observed.shape[1]))
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(json.dumps(info, indent=2) + "\n")
+    return g.linear_start(shape, info["top_m_s"], info["bottom_m_s"])
+
+
+def prepare_starts(datasets, workers, threads):
+    """Estimate every dataset's start in parallel before any fit needs it."""
+    jobs = [{"model": m, "condition": c, "snr": snr, "seed": s, "threads": threads}
+            for m, c, snr, s in datasets]
+    with ProcessPoolExecutor(workers) as pool:
+        list(pool.map(_start_job, jobs))
+
+
+def _start_job(job):
+    import torch
+
+    import gaussian_fwi as g
+
+    torch.set_num_threads(job["threads"])
+    reference = torch.from_numpy(np.load(f"models/{job['model']}.npy"))
+    survey, observed = g.synthetic(reference, g.DataConfig(
+        signal_to_noise=job["snr"], seed=job["seed"]))
+    starting_model(job, survey, observed, reference.shape)
 
 
 def execute(jobs, workers):
@@ -91,6 +127,7 @@ def slug(text):
 
 
 def tune(args):
+    prepare_starts([("marmousi", "snr10", 10.0, 0)], 1, args.threads * args.workers)
     jobs = [{"model": "marmousi", "condition": "snr10", "snr": 10.0, "seed": 0,
              "settings": s, "label": label(s), "steps": args.steps, "threads": args.threads,
              "path": str(OUTPUT / "tune" / slug(label(s)))}
@@ -112,6 +149,9 @@ def tune(args):
 
 def run(args):
     chosen = json.loads((OUTPUT / "settings.json").read_text())
+    prepare_starts([(m, c, snr, s) for m, (c, (snr, seeds)) in
+                    itertools.product(MODELS, CONDITIONS.items()) for s in seeds],
+                   args.workers, args.threads)
     jobs = []
     for model, (condition, (snr, seeds)) in itertools.product(MODELS, CONDITIONS.items()):
         for seed, (name, settings) in itertools.product(seeds, chosen.items()):
@@ -130,6 +170,11 @@ def report(args):
              "Params | Held-out misfit |", "|" + "---|" * 9]
     summary = {}
     for model, condition in itertools.product(MODELS, CONDITIONS):
+        group = [r for r in rows if (r["model"], r["condition"]) == (model, condition)]
+        if group:
+            start = {k: np.mean([r["start"][k] for r in group]) for k in keys}
+            lines.append(f"| {model} | {condition} | start (from data) | "
+                         + " | ".join(f"{start[k]:.0f}" for k in keys) + " | 2 | — |")
         for method in methods:
             group = [r for r in rows if (r["model"], r["condition"], r["label"])
                      == (model, condition, method)]
@@ -150,6 +195,12 @@ def report(args):
             wins[min(cases, key=lambda m: cases[m]["rmse"])] += 1
     lines += ["", "Lowest overall RMSE, out of model x condition cells: "
               + ", ".join(f"{m} {n}" for m, n in wins.items())]
+    for method in methods:
+        own = [r for r in rows if r["label"] == method]
+        worse = [r for r in own if r["rmse_deep"] > r["start"]["rmse_deep"] + 1]
+        lines.append(f"{method}: deep zone worse than its start in {len(worse)} of {len(own)} fits"
+                     + (": " + ", ".join(sorted({f"{r['model']}/{r['condition']}" for r in worse}))
+                        if worse else ""))
     text = "\n".join(lines)
     (OUTPUT / "report.md").write_text(text + "\n")
     print(text)
